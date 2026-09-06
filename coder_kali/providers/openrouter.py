@@ -51,12 +51,29 @@ class OpenRouterProvider(BaseLLMProvider):
         }
 
         try:
+            current_max_tokens = int(max_tokens)
             resp = requests.post(self.API_URL, json=payload, headers=headers, timeout=120)
+            if resp.status_code == 402:
+                # OpenRouter error 402: "This request requires more credits, or fewer max_tokens. You requested up to 4096 tokens, but can only afford 2097..."
+                import re
+                err_text = resp.text
+                match = re.search(r"can only afford\s+(\d+)", err_text, re.IGNORECASE)
+                if match:
+                    affordable = int(match.group(1))
+                    if affordable > 100:
+                        payload["max_tokens"] = affordable - 20
+                        resp = requests.post(self.API_URL, json=payload, headers=headers, timeout=120)
+
             if resp.status_code != 200:
                 err_text = resp.text
                 if resp.status_code == 401:
                     return LLMResponse(
                         error="API Key de OpenRouter inválida o sin créditos. Revisa tu cuenta en https://openrouter.ai/.",
+                        success=False,
+                    )
+                if resp.status_code == 402:
+                    return LLMResponse(
+                        error="Créditos insuficientes en OpenRouter para este modelo de pago. Puedes recargar en https://openrouter.ai/settings/credits o cambiar a un modelo gratuito como 'deepseek/deepseek-chat:free' o 'google/gemini-2.0-flash-exp:free'.",
                         success=False,
                     )
                 if resp.status_code == 429:
