@@ -1340,6 +1340,7 @@ def view_text_file(file_path: Optional[str] = None, tail: int = 0, follow: bool 
     """Muestra archivos de texto o logs con sintaxis resaltada y líneas."""
     import time
     from rich.syntax import Syntax
+    from rich.panel import Panel
     import questionary
 
     target: Optional[Path] = None

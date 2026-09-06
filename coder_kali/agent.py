@@ -190,6 +190,10 @@ class KaliAgent:
             "No puedo continuar ayudando a intentar acceder",
             "I’m sorry, but I can’t help with that",
             "I cannot help with that",
+            "Lo siento, no puedo ayudar con eso",
+            "No puedo ayudar con eso",
+            "no puedo cumplir con esta solicitud",
+            "no puedo ayudarte con eso",
         ]
 
         cleaned_chat = []
