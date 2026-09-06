@@ -436,16 +436,18 @@ def chat(
             elif cleaned_cmd in ["creds", "credenciales", "hashes"]:
                 _interactive_creds_menu()
                 continue
+            elif cleaned_cmd in ["vpn", "opsec", "anon", "ip", "red", "network"]:
+                from coder_kali.ui.vpn_menu import interactive_vpn_menu
+                interactive_vpn_menu()
+                continue
             elif cleaned_cmd in ["vulns", "vulnerabilidades", "scan"]:
                 console.print("[bold cyan][*] Usa 'blood-cipher audit vulns <target>' desde la terminal o escribe tu solicitud de auditoría aquí.[/bold cyan]")
-                continue
-            elif cleaned_cmd in ["network", "red", "net"]:
-                console.print("[bold cyan][*] Usa 'blood-cipher audit network <target>' desde la terminal o escribe tu solicitud de red aquí.[/bold cyan]")
                 continue
             elif cleaned_cmd in ["ayuda", "help", "?"]:
                 console.print("""
 [bold cyan]🎮 Comandos Rápidos e Interactivos del Chat:[/bold cyan]
   [bold green]inicio / menu[/bold green]   - Redibujar la interfaz y el banner táctico principal
+  [bold green]vpn / ip / anon[/bold green] - Gestor táctico Multi-VPN, comprobación de IP y OPSEC
   [bold green]scope / sow[/bold green]     - Cambiar, crear o importar un nuevo objetivo/alcance (SOW)
   [bold green]config / model[/bold green]  - Cambiar de modelo de IA o API Key al vuelo sin reiniciar
   [bold green]historial[/bold green]       - Listar y cambiar entre sesiones de chat anteriores
@@ -1217,6 +1219,109 @@ def audit_network(
                 console.print(f"\n[bold green][✓] Puertos abiertos encontrados: {', '.join(result.parsed_data['open_ports'])}[/bold green]")
             if "hosts" in result.parsed_data:
                 console.print(f"[bold green][✓] Hosts activos: {result.parsed_data.get('total', len(result.parsed_data['hosts']))}[/bold green]")
+
+
+
+# ==============================================================================
+# SUBCOMANDOS MULTI-VPN Y PRIVACIDAD OPSEC
+# ==============================================================================
+vpn_app = typer.Typer(
+    name="vpn",
+    help="🛡️ Gestor Multi-VPN y Privacidad (Surfshark, NordVPN, ProtonVPN, Mullvad, Custom, Tor).",
+    invoke_without_command=True,
+)
+app.add_typer(vpn_app, name="vpn")
+
+
+@vpn_app.callback()
+def vpn_default(ctx: typer.Context):
+    """Si se llama a 'blood-cipher vpn' sin subcomando, abre el menú interactivo."""
+    if ctx.invoked_subcommand is None:
+        from coder_kali.ui.vpn_menu import interactive_vpn_menu
+        interactive_vpn_menu()
+
+
+@vpn_app.command(name="status", help="Muestra el estado actual del túnel, interfaz de red e IP pública.")
+def vpn_status():
+    """Consulta la IP pública y estado de la VPN."""
+    from coder_kali.vpn_manager import VPNManager
+    from coder_kali.ui.vpn_menu import render_vpn_status_card
+    mgr = VPNManager()
+    render_vpn_status_card(mgr)
+
+
+@vpn_app.command(name="connect", help="Conecta a un proveedor de VPN (Surfshark, NordVPN, Proton, Custom).")
+def vpn_connect(
+    provider: str = typer.Argument("surfshark", help="Proveedor de VPN (surfshark, nordvpn, protonvpn, custom)"),
+    location: Optional[str] = typer.Option("es-mad", "--location", "-l", help="Código de ubicación (ej: es-mad, us-nyc, de-fra)"),
+    config: Optional[str] = typer.Option(None, "--config", "-c", help="Ruta directa a un archivo .ovpn"),
+    daemon: bool = typer.Option(True, "--daemon/--no-daemon", help="Ejecutar en segundo plano como servicio."),
+):
+    """Inicia el túnel VPN en segundo plano."""
+    from coder_kali.vpn_manager import VPNManager
+    mgr = VPNManager()
+    with console.status(f"[bold cyan]Estableciendo conexión VPN con {provider}...[/bold cyan]", spinner="dots"):
+        success, msg = mgr.connect(provider, config_path=config, location_code=location, daemon=daemon)
+    if success:
+        console.print(f"[bold green][✓] {msg}[/bold green]")
+    else:
+        console.print(f"[bold red][!] {msg}[/bold red]")
+
+
+@vpn_app.command(name="disconnect", help="Desconecta cualquier túnel VPN activo de Blood-Cipher.")
+def vpn_disconnect():
+    """Detiene el túnel VPN activo."""
+    from coder_kali.vpn_manager import VPNManager
+    mgr = VPNManager()
+    with console.status("[bold yellow]Desconectando túnel VPN...[/bold yellow]", spinner="dots"):
+        success, msg = mgr.disconnect()
+    console.print(f"[bold cyan]{msg}[/bold cyan]")
+
+
+@vpn_app.command(name="list", help="Lista las ubicaciones y perfiles disponibles para un proveedor.")
+def vpn_list(
+    provider: str = typer.Argument("surfshark", help="Proveedor a consultar (surfshark, nordvpn, protonvpn)")
+):
+    """Muestra servidores disponibles."""
+    from rich.table import Table
+    from coder_kali.vpn_manager import VPNManager, VPN_PROVIDERS
+    mgr = VPNManager()
+    meta = VPN_PROVIDERS.get(provider)
+    if not meta:
+        console.print(f"[red][!] Proveedor '{provider}' no reconocido.[/red]")
+        return
+
+    table = Table(title=f"📍 Servidores y Ubicaciones para {meta['name']}", border_style="cyan")
+    table.add_column("Código", style="bold green")
+    table.add_column("Ubicación", style="white")
+
+    pop = meta.get("popular_locations", [])
+    for row in pop:
+        table.add_row(row[0], row[1])
+
+    console.print(table)
+    local_files = mgr.list_available_ovpn_files(provider)
+    if local_files:
+        console.print(f"\n[bold green][✓] Perfiles .ovpn descargados localmente:[/bold green] {len(local_files)}")
+
+
+@vpn_app.command(name="test", help="Verifica si las APIs de IA son accesibles a través de la VPN actual.")
+def vpn_test():
+    """Prueba la salud de las APIs de IA con la conexión actual."""
+    from rich.table import Table
+    from coder_kali.vpn_manager import VPNManager
+    mgr = VPNManager()
+    with console.status("[bold cyan]Comprobando conectividad con proveedores de IA...[/bold cyan]", spinner="dots"):
+        results = mgr.check_ai_health()
+
+    table = Table(title="🧠 Estado de Conectividad con APIs de IA", border_style="cyan")
+    table.add_column("Servicio de IA", style="bold white")
+    table.add_column("Estado de Conexión", style="bold")
+
+    for name, ok in results.items():
+        table.add_row(name, "[green]✓ Accesible[/green]" if ok else "[red]✗ Inaccesible[/red]")
+
+    console.print(table)
 
 
 def main():
