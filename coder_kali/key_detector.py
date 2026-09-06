@@ -12,6 +12,14 @@ USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTM
 
 # Firmas y heurísticas directas de API Keys conocidas
 PROVIDER_KEY_PATTERNS = [
+    # Plugsky AI
+    {
+        "provider": "plugsky",
+        "name": "Plugsky AI (plugsky.com)",
+        "check": lambda k: k.startswith("sk-live-") or k.startswith("sk-ps-") or k.startswith("plugsky-") or k.startswith("psk_"),
+        "api_base": "https://api.plugsky.com/v1",
+        "default_model": "plugsky-pro",
+    },
     # BazaarLink AI
     {
         "provider": "bazaarlink",

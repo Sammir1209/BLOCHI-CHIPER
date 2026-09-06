@@ -394,6 +394,29 @@ DEFAULT_PROVIDERS = {
         "requires_api_key": True,
         "default_api_base": "https://bazaarlink.ai/api/v1",
     },
+    "plugsky": {
+        "name": "Plugsky AI (plugsky.com - 30+ Modelos)",
+        "default_model": "plugsky-pro",
+        "available_models": [
+            "plugsky-pro",
+            "plugsky-frontier",
+            "plugsky-micro",
+            "plugsky-lite",
+            "plugsky-max",
+            "deepseek-r1",
+            "deepseek-v3",
+            "mistral-large-3",
+            "llama-3.3-70b",
+            "qwen-2.5-72b",
+        ],
+        "free_models": [
+            "plugsky-micro",
+            "plugsky-lite",
+        ],
+        "env_var": "PLUGSKY_API_KEY",
+        "requires_api_key": True,
+        "default_api_base": "https://api.plugsky.com/v1",
+    },
 }
 
 DEFAULT_CONFIG: Dict[str, Any] = {
