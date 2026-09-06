@@ -440,6 +440,12 @@ def chat(
                 from coder_kali.ui.vpn_menu import interactive_vpn_menu
                 interactive_vpn_menu()
                 continue
+            elif cleaned_cmd.startswith(("ver ", "view ", "cat ", "leer ", "tail ")) or cleaned_cmd in ["ver", "view", "logs", "log"]:
+                parts = cleaned_cmd.split(maxsplit=1)
+                f_path = parts[1].strip() if len(parts) > 1 else None
+                tail_num = 50 if cleaned_cmd.startswith("tail ") else 0
+                view_text_file(file_path=f_path, tail=tail_num)
+                continue
             elif cleaned_cmd in ["vulns", "vulnerabilidades", "scan"]:
                 console.print("[bold cyan][*] Usa 'blood-cipher audit vulns <target>' desde la terminal o escribe tu solicitud de auditoría aquí.[/bold cyan]")
                 continue
@@ -447,6 +453,8 @@ def chat(
                 console.print("""
 [bold cyan]🎮 Comandos Rápidos e Interactivos del Chat:[/bold cyan]
   [bold green]inicio / menu[/bold green]   - Redibujar la interfaz y el banner táctico principal
+  [bold green]ver <archivo>[/bold green]   - Ver contenido de archivos .txt, .log, .json con colores
+  [bold green]logs[/bold green]            - Inspeccionar logs del sistema y de conexiones VPN
   [bold green]vpn / ip / anon[/bold green] - Gestor táctico Multi-VPN, comprobación de IP y OPSEC
   [bold green]scope / sow[/bold green]     - Cambiar, crear o importar un nuevo objetivo/alcance (SOW)
   [bold green]config / model[/bold green]  - Cambiar de modelo de IA o API Key al vuelo sin reiniciar
@@ -1322,6 +1330,159 @@ def vpn_test():
         table.add_row(name, "[green]✓ Accesible[/green]" if ok else "[red]✗ Inaccesible[/red]")
 
     console.print(table)
+
+
+
+# ==============================================================================
+# VISUALIZADOR DE ARCHIVOS DE TEXTO Y LOGS (.txt, .log, .json, .ovpn, etc.)
+# ==============================================================================
+def view_text_file(file_path: Optional[str] = None, tail: int = 0, follow: bool = False):
+    """Muestra archivos de texto o logs con sintaxis resaltada y líneas."""
+    import time
+    from rich.syntax import Syntax
+    import questionary
+
+    target: Optional[Path] = None
+
+    if file_path:
+        raw_p = file_path.strip().strip('"').strip("'")
+        p = Path(raw_p)
+        if p.exists() and p.is_file():
+            target = p
+        else:
+            # Buscar en directorio actual o en ~/.config/blood-cipher
+            matches = [m for m in Path.cwd().glob(f"**/*{p.name}*") if m.is_file()]
+            if not matches:
+                from coder_kali.config import CONFIG_DIR
+                matches = [m for m in CONFIG_DIR.glob(f"**/*{p.name}*") if m.is_file()]
+            if matches:
+                target = matches[0]
+
+    if not target or not target.exists():
+        # Si no se pasó archivo o no se encontró, buscar candidatos interesantes
+        candidates = []
+        from coder_kali.config import CONFIG_DIR
+        for ext in ["*.log", "*.txt", "*.json", "*.ovpn", "*.md", "*.py", "*.sh"]:
+            candidates.extend([f for f in Path.cwd().glob(ext) if f.is_file()])
+        for ext in ["*.log", "*.txt", "*.json", "*.ovpn"]:
+            candidates.extend([f for f in CONFIG_DIR.glob(f"**/{ext}") if f.is_file()])
+
+        unique = sorted(
+            list({p.resolve(): p for p in candidates if p.is_file()}.values()),
+            key=lambda x: x.stat().st_mtime,
+            reverse=True
+        )
+
+        if not unique:
+            console.print(f"[red][!] Archivo '{file_path}' no encontrado y no hay logs disponibles.[/red]")
+            return
+
+        choices = [
+            questionary.Choice(
+                title=f"📄 {p.name}  [dim]({p.parent} • {p.stat().st_size} B)[/dim]",
+                value=str(p)
+            )
+            for p in unique[:25]
+        ]
+        chosen = questionary.select(
+            "Selecciona el archivo de texto o log que deseas inspeccionar:",
+            choices=choices,
+        ).ask()
+        if not chosen:
+            return
+        target = Path(chosen)
+
+    try:
+        if follow:
+            console.print(f"[bold cyan]📡 Siguiendo en vivo: {target.name} (Ctrl+C para detener)...[/bold cyan]\n")
+            with open(target, "r", encoding="utf-8", errors="replace") as f:
+                f.seek(0, 2)
+                while True:
+                    line = f.readline()
+                    if line:
+                        console.print(line.rstrip())
+                    else:
+                        time.sleep(0.5)
+        else:
+            raw_text = target.read_text(encoding="utf-8", errors="replace")
+            lines = raw_text.splitlines()
+            total_lines = len(lines)
+
+            if tail > 0 and total_lines > tail:
+                display_text = "\n".join(lines[-tail:])
+                line_info = f"Últimas {tail} de {total_lines} líneas"
+                start_line = total_lines - tail + 1
+            else:
+                display_text = raw_text
+                line_info = f"{total_lines} líneas"
+                start_line = 1
+
+            ext = target.suffix.lower().lstrip(".")
+            lexer_map = {
+                "log": "log",
+                "txt": "text",
+                "json": "json",
+                "py": "python",
+                "sh": "bash",
+                "ovpn": "ini",
+                "conf": "ini",
+                "md": "markdown",
+            }
+            lexer = lexer_map.get(ext, "text")
+
+            syntax = Syntax(
+                display_text,
+                lexer,
+                theme="monokai",
+                line_numbers=True,
+                start_line=start_line,
+                word_wrap=True,
+            )
+
+            console.print(Panel(
+                syntax,
+                title=f"[bold green]📄 {target.name}[/bold green] [dim]({line_info} • {target.stat().st_size} bytes)[/dim]",
+                subtitle=f"[dim]{target}[/dim]",
+                border_style="cyan",
+            ))
+    except KeyboardInterrupt:
+        console.print("\n[yellow][*] Visualización detenida.[/yellow]")
+    except Exception as e:
+        console.print(f"[red][!] Error al leer el archivo {target}: {e}[/red]")
+
+
+@app.command(name="ver", help="Visualiza archivos .txt, .log, .json o scripts con resaltado de sintaxis y líneas.")
+def cmd_ver(
+    file_path: Optional[str] = typer.Argument(None, help="Ruta al archivo (ej: logs.txt, vpn.log, cookies.txt). Si se omite, muestra un selector."),
+    tail: int = typer.Option(0, "--tail", "-t", help="Mostrar solo las últimas N líneas."),
+    follow: bool = typer.Option(False, "--follow", "-f", help="Seguir el archivo en tiempo real (similar a tail -f)."),
+):
+    """Visualizador enriquecido de logs y textos."""
+    view_text_file(file_path=file_path, tail=tail, follow=follow)
+
+
+@app.command(name="view", help="Alias en inglés de 'ver'.")
+def cmd_view(
+    file_path: Optional[str] = typer.Argument(None, help="Ruta al archivo a visualizar."),
+    tail: int = typer.Option(0, "--tail", "-t", help="Mostrar solo las últimas N líneas."),
+    follow: bool = typer.Option(False, "--follow", "-f", help="Seguir el archivo en tiempo real."),
+):
+    """Visualizador de textos."""
+    view_text_file(file_path=file_path, tail=tail, follow=follow)
+
+
+@app.command(name="logs", help="Acceso rápido a los logs del sistema y de la VPN.")
+def cmd_logs(
+    tail: int = typer.Option(40, "--tail", "-t", help="Número de líneas a mostrar."),
+    follow: bool = typer.Option(False, "--follow", "-f", help="Seguir en vivo."),
+):
+    """Muestra el log de VPN o logs disponibles."""
+    from coder_kali.config import CONFIG_DIR
+    vpn_log = CONFIG_DIR / "vpn" / "vpn.log"
+    if vpn_log.exists():
+        view_text_file(str(vpn_log), tail=tail, follow=follow)
+    else:
+        view_text_file(None, tail=tail, follow=follow)
 
 
 def main():

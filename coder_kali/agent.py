@@ -202,8 +202,9 @@ class KaliAgent:
                 continue
             cleaned_chat.append(m)
 
-        # En Groq, conservar un número adecuado de turnos recientes
-        max_history = 10 if is_groq else 24
+        # En Groq el tier gratuito tiene un límite estricto de TPM (Tokens Por Minuto)
+        # por lo que mantenemos una ventana compacta de turnos recientes para evitar 429 continuos
+        max_history = 6 if is_groq else 24
         if len(cleaned_chat) > max_history:
             recent_msgs = [cleaned_chat[0]] + cleaned_chat[-(max_history - 1):]
         else:
@@ -221,11 +222,11 @@ class KaliAgent:
 
             # Compactar salidas de terminal intermedias para no consumir TPM innecesario
             is_latest = i == (len(recent_msgs) - 1)
-            max_char_limit = 2000 if is_latest else (800 if is_groq else 1500)
+            max_char_limit = (1000 if is_latest else 450) if is_groq else (2000 if is_latest else 1500)
 
             if "[RESULTADOS_SISTEMA" in content or "[SALIDA_COMANDO" in content:
                 if len(content) > max_char_limit:
-                    compacted_content = content[:int(max_char_limit * 0.7)] + "\n... [salida de terminal resumida] ...\n" + content[-int(max_char_limit * 0.3):]
+                    compacted_content = content[:int(max_char_limit * 0.7)] + "\n... [salida resumida] ...\n" + content[-int(max_char_limit * 0.3):]
                     api_messages.append({"role": role, "content": compacted_content})
                     continue
 
