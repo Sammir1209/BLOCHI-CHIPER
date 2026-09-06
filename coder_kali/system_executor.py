@@ -272,23 +272,23 @@ class SystemExecutor:
             console.print("\n[yellow][*] Operación cancelada por el usuario.[/yellow]")
             return False
 
-    def execute_command(self, cmd: str, is_sudo: bool = False) -> ExecutionResult:
+    def execute_command(self, cmd: str, is_sudo: bool = False, cwd: Optional[str] = None) -> ExecutionResult:
         """Ejecuta un comando en el sistema operativo capturando stdout y stderr."""
         console.print(f"[dim cyan][*] Ejecutando: {cmd}[/dim cyan]")
 
         # Si estamos en Linux y requiere sudo o interactividad
         if self.is_linux and is_sudo and not self.is_termux:
-            return self._execute_linux_pty(cmd)
+            return self._execute_linux_pty(cmd, cwd=cwd)
         else:
-            return self._execute_standard(cmd)
+            return self._execute_standard(cmd, cwd=cwd)
 
-    def _execute_linux_pty(self, cmd: str) -> ExecutionResult:
+    def _execute_linux_pty(self, cmd: str, cwd: Optional[str] = None) -> ExecutionResult:
         """Ejecuta en Linux usando PTY o pexpect para permitir interacción segura con sudo."""
         try:
             import pexpect
 
             # Ejecutar a través del shell dinámico resuelto
-            child = pexpect.spawn(self.shell_path, ["-c", cmd], encoding="utf-8", timeout=600)
+            child = pexpect.spawn(self.shell_path, ["-c", cmd], encoding="utf-8", timeout=600, cwd=cwd)
             output_chunks = []
 
             # Dejar que el usuario interactúe directamente si pide contraseña
@@ -318,22 +318,17 @@ class SystemExecutor:
             if not full_output:
                 full_output = "[Comando ejecutado sin salida estándar]"
             elif len(full_output) > 20000:
-                total_len = len(full_output)
-                full_output = (
-                    final_output[:10000]
-                    + f"\n\n... [Salida muy extensa: {total_len} caracteres detectados. Truncado para preservar contexto de IA] ...\n\n"
-                    + full_output[-5000:]
-                )
+                full_output = full_output[:10000] + "\n\n... [Salida extensa truncada] ...\n\n" + full_output[-5000:]
 
             return ExecutionResult(
-                success=child.exitstatus == 0,
+                success=(child.exitstatus == 0),
                 output=full_output,
                 returncode=child.exitstatus or 0,
                 command=cmd,
             )
         except ImportError:
             # Si pexpect no está disponible, usar subprocess normal
-            return self._execute_standard(cmd)
+            return self._execute_standard(cmd, cwd=cwd)
         except Exception as e:
             return ExecutionResult(
                 success=False,
@@ -342,7 +337,7 @@ class SystemExecutor:
                 command=cmd,
             )
 
-    def _execute_standard(self, cmd: str) -> ExecutionResult:
+    def _execute_standard(self, cmd: str, cwd: Optional[str] = None) -> ExecutionResult:
         """Ejecución estándar mediante subprocess (PowerShell en Windows, Bash/Sh en Linux y Termux)."""
         try:
             if self.is_linux:
@@ -373,6 +368,7 @@ class SystemExecutor:
                     stderr=subprocess.PIPE,
                     text=True,
                     close_fds=True,
+                    cwd=cwd,
                 )
                 pid_info = process.pid
                 return ExecutionResult(
@@ -390,6 +386,7 @@ class SystemExecutor:
                 text=True,
                 encoding="utf-8",
                 errors="replace",
+                cwd=cwd,
             )
             stdout, stderr = process.communicate(timeout=600)
             combined_output = []
@@ -433,10 +430,14 @@ class SystemExecutor:
                 command=cmd,
             )
 
-    def write_file(self, target_path: str, content: str) -> ExecutionResult:
+    def write_file(self, target_path: str, content: str, cwd: Optional[str] = None) -> ExecutionResult:
         """Crea o sobrescribe un archivo en el sistema de archivos."""
         try:
-            path_obj = Path(target_path).expanduser().resolve()
+            p = Path(target_path).expanduser()
+            if not p.is_absolute() and cwd:
+                path_obj = (Path(cwd) / p).resolve()
+            else:
+                path_obj = p.resolve()
             # Crear directorios padres si no existen
             path_obj.parent.mkdir(parents=True, exist_ok=True)
             path_obj.write_text(content, encoding="utf-8")
@@ -459,8 +460,8 @@ class SystemExecutor:
                 is_file_op=True,
             )
 
-    def process_action(self, action: ParsedAction) -> ExecutionResult:
-        """Procesa una acción individual (comando o archivo) gestionando la confirmación."""
+    def process_action(self, action: ParsedAction, cwd: Optional[str] = None) -> ExecutionResult:
+        """Procesa una acción individual (comando o archivo) gestionando la confirmación y cwd."""
         if action.action_type == "command":
             # Comandos normales (no sudo y no críticos) se ejecutan automáticamente sin interrumpir
             requires_confirmation = action.is_sudo or action.is_dangerous
@@ -480,7 +481,7 @@ class SystemExecutor:
                     command=action.content,
                     was_rejected=True,
                 )
-            return self.execute_command(action.content, is_sudo=action.is_sudo)
+            return self.execute_command(action.content, is_sudo=action.is_sudo, cwd=cwd)
 
         elif action.action_type == "file":
             if not action.target_path:

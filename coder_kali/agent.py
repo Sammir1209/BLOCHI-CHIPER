@@ -536,7 +536,11 @@ class KaliAgent:
                     except Exception:
                         pass
 
-                result = self.executor.process_action(action)
+                workspace_dir = getattr(self.current_session, "workspace_path", None)
+                if not workspace_dir:
+                    workspace_dir = str(self.session_mgr.get_session_workspace(self.current_session.id))
+
+                result = self.executor.process_action(action, cwd=workspace_dir)
                 render_execution_result(result, command=action.content if action.action_type == "command" else None)
 
                 if self.on_action_update:

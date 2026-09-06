@@ -446,6 +446,9 @@ def chat(
                 tail_num = 50 if cleaned_cmd.startswith("tail ") else 0
                 view_text_file(file_path=f_path, tail=tail_num)
                 continue
+            elif cleaned_cmd in ["teclado", "keyboard", "idioma", "layout"]:
+                interactive_keyboard_menu()
+                continue
             elif cleaned_cmd in ["vulns", "vulnerabilidades", "scan"]:
                 console.print("[bold cyan][*] Usa 'blood-cipher audit vulns <target>' desde la terminal o escribe tu solicitud de auditoría aquí.[/bold cyan]")
                 continue
@@ -454,6 +457,7 @@ def chat(
 [bold cyan]🎮 Comandos Rápidos e Interactivos del Chat:[/bold cyan]
   [bold green]inicio / menu[/bold green]   - Redibujar la interfaz y el banner táctico principal
   [bold green]ver <archivo>[/bold green]   - Ver contenido de archivos .txt, .log, .json con colores
+  [bold green]teclado[/bold green]         - Cambiar distribución del teclado a Perú / Latam / ES al instante
   [bold green]logs[/bold green]            - Inspeccionar logs del sistema y de conexiones VPN
   [bold green]vpn / ip / anon[/bold green] - Gestor táctico Multi-VPN, comprobación de IP y OPSEC
   [bold green]scope / sow[/bold green]     - Cambiar, crear o importar un nuevo objetivo/alcance (SOW)
@@ -1479,11 +1483,113 @@ def cmd_logs(
 ):
     """Muestra el log de VPN o logs disponibles."""
     from coder_kali.config import CONFIG_DIR
-    vpn_log = CONFIG_DIR / "vpn" / "vpn.log"
-    if vpn_log.exists():
-        view_text_file(str(vpn_log), tail=tail, follow=follow)
+# ==============================================================================
+# CONFIGURADOR RÁPIDO DE DISTRIBUCIÓN DE TECLADO (PERÚ / LATAM / ES / US)
+# ==============================================================================
+def set_keyboard_layout(layout_code: str, variant: str = "") -> bool:
+    """Configura la distribución de teclado en Linux usando setxkbmap y localectl."""
+    import subprocess
+    import shutil
+    import platform
+
+    if platform.system().lower() != "linux":
+        console.print("[yellow][!] La configuración directa de teclado está optimizada para Linux/Kali Linux.[/yellow]")
+        return False
+
+    success = False
+    # 1. Intentar con setxkbmap (entorno gráfico X11 / XFCE / KDE)
+    if shutil.which("setxkbmap"):
+        cmd = ["setxkbmap", layout_code]
+        if variant:
+            cmd.extend(["-variant", variant])
+        try:
+            res = subprocess.run(cmd, capture_output=True, text=True)
+            if res.returncode == 0:
+                success = True
+        except Exception:
+            pass
+
+    # 2. Intentar con localectl (systemd / consola y persistencia)
+    if shutil.which("localectl"):
+        cmd = ["localectl", "set-x11-keymap", layout_code]
+        if variant:
+            cmd.append(variant)
+        if os.geteuid() != 0:
+            cmd.insert(0, "sudo")
+        try:
+            res = subprocess.run(cmd, capture_output=True, text=True)
+            if res.returncode == 0:
+                success = True
+        except Exception:
+            pass
+
+    # 3. Fallback a loadkeys si estamos en TTY de consola
+    if shutil.which("loadkeys") and os.geteuid() == 0:
+        try:
+            subprocess.run(["loadkeys", layout_code], capture_output=True)
+            success = True
+        except Exception:
+            pass
+
+    return success
+
+
+def interactive_keyboard_menu():
+    """Menú interactivo para cambiar la distribución del teclado."""
+    import questionary
+    from rich.panel import Panel
+
+    choices = [
+        questionary.Choice("🇵🇪 Perú / Español Latinoamericano (latam - QWERTY con Ñ)", value="latam"),
+        questionary.Choice("🇪🇸 España / Castellano (es - QWERTY tradicional)", value="es"),
+        questionary.Choice("🇺🇸 Estados Unidos / Internacional con AltGr (us altgr-intl)", value="us_intl"),
+        questionary.Choice("🇺🇸 Estados Unidos Estándar (us - QWERTY)", value="us"),
+        questionary.Choice("⬅️ Volver", value="BACK"),
+    ]
+
+    selected = questionary.select(
+        "Selecciona la distribución de teclado que deseas activar en Kali Linux:",
+        choices=choices,
+    ).ask()
+
+    if not selected or selected == "BACK":
+        return
+
+    layout = selected
+    variant = ""
+    if selected == "us_intl":
+        layout = "us"
+        variant = "altgr-intl"
+
+    with console.status(f"[bold cyan]Configurando teclado en '{layout}'...[/bold cyan]", spinner="dots"):
+        ok = set_keyboard_layout(layout, variant)
+
+    if ok:
+        console.print(Panel(
+            f"[bold green]✓ Teclado configurado con éxito a:[/bold green] [bold white]{selected.upper()}[/bold white]\n"
+            f"[dim]Comando ejecutado: setxkbmap {layout} {variant}[/dim]\n"
+            "Ahora las teclas especiales (@, #, ~, Ñ, tildes) responderán a tu teclado físico de Perú.",
+            title="[bold green]⌨️ TECLADO ACTUALIZADO[/bold green]",
+            border_style="green",
+        ))
     else:
-        view_text_file(None, tail=tail, follow=follow)
+        # Si falló porque no hay X11 o permisos, mostrar comando manual
+        console.print(f"[yellow][!] Puedes ejecutar manualmente: [bold white]setxkbmap {layout}[/bold white][/yellow]")
+
+
+@app.command(name="teclado", help="Cambia la distribución del teclado en Kali Linux (Perú, Latam, ES, US).")
+def cmd_teclado(
+    layout: Optional[str] = typer.Argument(None, help="Código de distribución (latam, es, us). Si se omite, muestra menú.")
+):
+    """Configuración rápida del teclado físico."""
+    if layout:
+        ok = set_keyboard_layout(layout)
+        if ok:
+            console.print(f"[bold green][✓] Teclado cambiado a: {layout}[/bold green]")
+        else:
+            console.print(f"[yellow][!] Intenta: setxkbmap {layout}[/yellow]")
+    else:
+        interactive_keyboard_menu()
 
 
 def main():
