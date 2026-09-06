@@ -1535,46 +1535,61 @@ def set_keyboard_layout(layout_code: str, variant: str = "") -> bool:
 
 
 def interactive_keyboard_menu():
-    """Menú interactivo para cambiar la distribución del teclado."""
+    """Menú interactivo con catálogo completo para cambiar la distribución del teclado."""
     import questionary
     from rich.panel import Panel
 
     choices = [
-        questionary.Choice("🇵🇪 Perú / Español Latinoamericano (latam - QWERTY con Ñ)", value="latam"),
-        questionary.Choice("🇪🇸 España / Castellano (es - QWERTY tradicional)", value="es"),
-        questionary.Choice("🇺🇸 Estados Unidos / Internacional con AltGr (us altgr-intl)", value="us_intl"),
-        questionary.Choice("🇺🇸 Estados Unidos Estándar (us - QWERTY)", value="us"),
+        questionary.Choice("🇵🇪 Perú / Español Latinoamericano (latam - con tecla Ñ)", value="latam"),
+        questionary.Choice("🇪🇸 España / Castellano tradicional (es)", value="es"),
+        questionary.Choice("🇺🇸 Estados Unidos / Internacional con AltGr y tildes (us altgr-intl)", value="us_intl"),
+        questionary.Choice("🇺🇸 Estados Unidos Estándar QWERTY (us)", value="us"),
+        questionary.Choice("🇧🇷 Brasil / Portugués ABNT2 (br)", value="br"),
+        questionary.Choice("🇫🇷 Francia / AZERTY (fr)", value="fr"),
+        questionary.Choice("🇩🇪 Alemania / QWERTZ (de)", value="de"),
+        questionary.Choice("🇬🇧 Reino Unido / UK English (gb)", value="gb"),
+        questionary.Choice("🇮🇹 Italia (it)", value="it"),
+        questionary.Choice("🇷🇺 Rusia / Cirílico (ru)", value="ru"),
+        questionary.Choice("🇯🇵 Japón (jp)", value="jp"),
+        questionary.Choice("✍️  Otro / Escribir código personalizado manualmente (custom)", value="CUSTOM"),
         questionary.Choice("⬅️ Volver", value="BACK"),
     ]
 
     selected = questionary.select(
-        "Selecciona la distribución de teclado que deseas activar en Kali Linux:",
+        "¿Qué distribución o tipo de teclado deseas activar en tu sistema?",
         choices=choices,
     ).ask()
 
     if not selected or selected == "BACK":
         return
 
-    layout = selected
     variant = ""
-    if selected == "us_intl":
+    if selected == "CUSTOM":
+        custom_input = questionary.text(
+            "Escribe el código de distribución de teclado (ej: latam, es, us, fr, de):"
+        ).ask()
+        if not custom_input or not custom_input.strip():
+            return
+        layout = custom_input.strip().lower()
+    elif selected == "us_intl":
         layout = "us"
         variant = "altgr-intl"
+    else:
+        layout = selected
 
     with console.status(f"[bold cyan]Configurando teclado en '{layout}'...[/bold cyan]", spinner="dots"):
         ok = set_keyboard_layout(layout, variant)
 
     if ok:
         console.print(Panel(
-            f"[bold green]✓ Teclado configurado con éxito a:[/bold green] [bold white]{selected.upper()}[/bold white]\n"
-            f"[dim]Comando ejecutado: setxkbmap {layout} {variant}[/dim]\n"
-            "Ahora las teclas especiales (@, #, ~, Ñ, tildes) responderán a tu teclado físico de Perú.",
+            f"[bold green]✓ Distribución de teclado configurada con éxito:[/bold green] [bold white]{layout.upper()}{f' ({variant})' if variant else ''}[/bold white]\n"
+            f"[dim]Comando aplicado: setxkbmap {layout} {variant}[/dim]\n"
+            "Tu teclado físico ahora responderá con la disposición de teclas correspondiente.",
             title="[bold green]⌨️ TECLADO ACTUALIZADO[/bold green]",
             border_style="green",
         ))
     else:
-        # Si falló porque no hay X11 o permisos, mostrar comando manual
-        console.print(f"[yellow][!] Puedes ejecutar manualmente: [bold white]setxkbmap {layout}[/bold white][/yellow]")
+        console.print(f"[yellow][!] Puedes ejecutar manualmente en tu terminal: [bold white]setxkbmap {layout}[/bold white][/yellow]")
 
 
 @app.command(name="teclado", help="Cambia la distribución del teclado en Kali Linux (Perú, Latam, ES, US).")
