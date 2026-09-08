@@ -457,11 +457,11 @@ class KaliAgent:
                                 time.sleep(wait_seconds)
                                 continue
                         
-                        # Si es un error de timeout / conexión temporal / backend proxy
-                        if "context deadline exceeded" in err_str or "Client.Timeout" in err_str or "timed out" in err_str.lower() or "504" in err_str or "502" in err_str or "503" in err_str:
+                        # Si es un error de timeout / conexión temporal / backend proxy / sobrecarga del proveedor
+                        if any(term in err_str.lower() for term in ["context deadline exceeded", "client.timeout", "timed out", "504", "503", "502", "500", "upstream_failure", "temporarily overloaded", "internal server error"]):
                             retry_count += 1
                             if retry_count < max_retries:
-                                console.print(f"[yellow][!] El proveedor {provider.upper()} tuvo un timeout de red. Reintentando ({retry_count}/{max_retries})...[/yellow]")
+                                console.print(f"[yellow][!] El proveedor {provider.upper()} reportó sobrecarga/timeout temporal. Reintentando ({retry_count}/{max_retries})...[/yellow]")
                                 import time
                                 time.sleep(3 + retry_count * 2)
                                 continue

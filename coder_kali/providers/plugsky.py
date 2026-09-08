@@ -95,9 +95,33 @@ class PlugskyProvider(BaseLLMProvider):
                         ),
                         success=False,
                     )
-                if resp.status_code == 429:
+                if resp.status_code in (500, 502, 503, 504) or "upstream_failure" in err_text or "temporarily overloaded" in err_text:
+                    # Si el modelo específico está caído en el backend de Plugsky, intentar fallback rápido a otro modelo disponible
+                    fallback_models = ["plugsky-frontier", "plugsky-pro", "deepseek-v3", "plugsky-micro"]
+                    for alt_model in fallback_models:
+                        if alt_model == clean_model:
+                            continue
+                        alt_payload = dict(payload)
+                        alt_payload["model"] = alt_model
+                        try:
+                            alt_resp = requests.post(endpoint, json=alt_payload, headers=headers, timeout=60)
+                            if alt_resp.status_code == 200:
+                                alt_data = alt_resp.json()
+                                alt_choices = alt_data.get("choices", [])
+                                if alt_choices:
+                                    alt_msg = alt_choices[0].get("message", {})
+                                    return LLMResponse(
+                                        content=alt_msg.get("content", "") or alt_msg.get("reasoning_content", "") or "",
+                                        reasoning_content=alt_msg.get("reasoning_content", "") or "",
+                                        raw_response=alt_data,
+                                        tokens_used=alt_data.get("usage", {}).get("total_tokens", 0),
+                                        success=True,
+                                    )
+                        except Exception:
+                            continue
+
                     return LLMResponse(
-                        error="Límite de peticiones alcanzado en Plugsky (429 Rate Limit). Intenta más tarde o rota tu API Key.",
+                        error=f"Error en Plugsky ({resp.status_code}): Servidor o modelo temporalmente sobrecargado (upstream_failure).",
                         success=False,
                     )
                 return LLMResponse(
