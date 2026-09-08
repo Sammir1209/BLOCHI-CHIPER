@@ -206,9 +206,10 @@ class KaliAgent:
                 continue
             cleaned_chat.append(m)
 
-        # En Groq el tier gratuito tiene un límite estricto de TPM (Tokens Por Minuto)
-        # por lo que mantenemos una ventana compacta de turnos recientes para evitar 429 continuos
-        max_history = 6 if is_groq else 24
+        # En Groq y Plugsky el tier gratuito tiene límites de contexto / TPM
+        # por lo que mantenemos una ventana compacta de turnos recientes para evitar 429 / 503 continuos
+        is_plugsky = provider == "plugsky"
+        max_history = 6 if is_groq else (12 if is_plugsky else 24)
         if len(cleaned_chat) > max_history:
             recent_msgs = [cleaned_chat[0]] + cleaned_chat[-(max_history - 1):]
         else:
@@ -226,7 +227,12 @@ class KaliAgent:
 
             # Compactar salidas de terminal intermedias para no consumir TPM innecesario
             is_latest = i == (len(recent_msgs) - 1)
-            max_char_limit = (1000 if is_latest else 450) if is_groq else (2000 if is_latest else 1500)
+            if is_groq:
+                max_char_limit = 1000 if is_latest else 450
+            elif is_plugsky:
+                max_char_limit = 1200 if is_latest else 600
+            else:
+                max_char_limit = 2000 if is_latest else 1500
 
             if "[RESULTADOS_SISTEMA" in content or "[SALIDA_COMANDO" in content:
                 if len(content) > max_char_limit:
@@ -334,6 +340,8 @@ class KaliAgent:
                         configured_max = self.config_mgr.get("max_tokens", 4096)
                         if provider == "groq":
                             max_tokens = min(configured_max, 1024)
+                        elif provider == "plugsky":
+                            max_tokens = min(configured_max, 2048)
                         elif provider in ["bai", "aimlapi", "openai", "anthropic", "openrouter", "gemini", "puter", "bazaarlink"]:
                             max_tokens = max(configured_max, 4096)
                         else:
