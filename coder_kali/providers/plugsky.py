@@ -96,8 +96,8 @@ class PlugskyProvider(BaseLLMProvider):
                         success=False,
                     )
                 if resp.status_code in (500, 502, 503, 504) or "upstream_failure" in err_text or "temporarily overloaded" in err_text:
-                    # Si el modelo específico está caído en el backend de Plugsky, intentar fallback rápido a otro modelo disponible
-                    fallback_models = ["plugsky-frontier", "plugsky-pro", "deepseek-v3", "plugsky-micro"]
+                    # Si el modelo específico está caído en el backend de Plugsky, intentar fallback a otros modelos
+                    fallback_models = ["plugsky-micro", "plugsky-lite", "plugsky-pro", "plugsky-frontier", "deepseek-v3"]
                     for alt_model in fallback_models:
                         if alt_model == clean_model:
                             continue
