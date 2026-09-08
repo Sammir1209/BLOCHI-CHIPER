@@ -113,6 +113,11 @@ class SystemExecutor:
             file_content = match.group(4)
             if file_content.startswith("\n"):
                 file_content = file_content[1:]
+            # Sanitizar si el modelo alucina tags o markdown dentro del archivo
+            file_content = re.sub(r'</?(?:escribir_comando|ejecutar_comando|tool_call|escribir_archivo)[^>]*>', '', file_content, flags=re.IGNORECASE)
+            file_content = re.sub(r'^```(?:python|bash|sh|json|text)?\s*\n', '', file_content, flags=re.IGNORECASE)
+            file_content = re.sub(r'\n```\s*$', '', file_content)
+            file_content = file_content.rstrip() + "\n"
             file_actions.append(
                 ParsedAction(
                     action_type="file",
