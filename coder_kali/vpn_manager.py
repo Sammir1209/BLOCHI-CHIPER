@@ -189,6 +189,8 @@ class VPNManager:
     def check_ai_health(self) -> Dict[str, bool]:
         """Comprueba conectividad directa con las APIs de IA para verificar que la VPN no las bloquea."""
         endpoints = {
+            "Plugsky AI": "https://api.plugsky.com",
+            "OpenRouter": "https://openrouter.ai/api/v1/models",
             "Puter AI": "https://api.puter.com",
             "DeepSeek": "https://api.deepseek.com",
             "HuggingFace": "https://huggingface.co",
@@ -198,7 +200,7 @@ class VPNManager:
         results = {}
         for name, url in endpoints.items():
             try:
-                r = requests.head(url, timeout=3.0, allow_redirects=True)
+                r = requests.head(url, timeout=4.0, allow_redirects=True)
                 results[name] = r.status_code in [200, 301, 302, 401, 403, 404, 405]
             except Exception:
                 results[name] = False
