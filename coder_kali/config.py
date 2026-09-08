@@ -87,8 +87,12 @@ DEFAULT_PROVIDERS = {
     },
     "groq": {
         "name": "Groq (Inferencia Ultra Rápida)",
-        "default_model": "groq/llama-3.3-70b-versatile",
+        "default_model": "openai/gpt-oss-120b",
         "available_models": [
+            "openai/gpt-oss-120b",
+            "openai/gpt-oss-20b",
+            "qwen/qwen3.8-27b",
+            "qwen/qwen3.6-27b",
             "groq/llama-3.3-70b-versatile",
             "groq/llama-3.1-8b-instant",
             "groq/llama-3.2-11b-vision-preview",
@@ -100,6 +104,9 @@ DEFAULT_PROVIDERS = {
             "groq/deepseek-r1-distill-llama-70b",
         ],
         "free_models": [
+            "openai/gpt-oss-120b",
+            "openai/gpt-oss-20b",
+            "qwen/qwen3.8-27b",
             "groq/llama-3.3-70b-versatile",
             "groq/llama-3.1-8b-instant",
             "groq/gemma2-9b-it",
