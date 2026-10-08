@@ -236,6 +236,50 @@ def main_callback(
         chat(new_session=new_session)
 
 
+def perform_system_update():
+    """Ejecuta git pull y pip install -e . para actualizar el proyecto de forma 100% automática."""
+    import subprocess
+    import platform
+    from rich.panel import Panel
+    console.print("\n[bold cyan]🔄 Iniciando actualización automática de Blood-Cipher...[/bold cyan]")
+
+    repo_dir = Path(__file__).parent.parent.resolve()
+    console.print(f"[dim][*] Directorio del repositorio: {repo_dir}[/dim]")
+
+    try:
+        console.print("[cyan][*] Obteniendo últimos cambios de GitHub (git pull origin main)...[/cyan]")
+        pull_res = subprocess.run(["git", "pull", "origin", "main"], cwd=repo_dir, capture_output=True, text=True)
+        if pull_res.stdout:
+            console.print(f"[dim]{pull_res.stdout.strip()}[/dim]")
+        if pull_res.returncode != 0 and pull_res.stderr:
+            console.print(f"[yellow][!] Aviso de git: {pull_res.stderr.strip()}[/yellow]")
+
+        console.print("[cyan][*] Aplicando actualizaciones de paquetes (pip install -e .)...[/cyan]")
+        pip_cmd = [sys.executable, "-m", "pip", "install", "-e", "."]
+        if platform.system() != "Windows":
+            pip_cmd.append("--break-system-packages")
+
+        pip_res = subprocess.run(pip_cmd, cwd=repo_dir, capture_output=True, text=True)
+        if pip_res.returncode == 0:
+            console.print(Panel(
+                "[bold green]✓ ¡BLOOD-CIPHER SE HA ACTUALIZADO EXITOSAMENTE A LA ÚLTIMA VERSIÓN![/bold green]\n"
+                "[dim]Todos los módulos, parches e IA están sincronizados al 100%.[/dim]",
+                title="🚀 ACTUALIZACIÓN AUTOMÁTICA COMPLETADA",
+                border_style="bright_green"
+            ))
+        else:
+            console.print(f"[bold red][!] Error al reinstalar el paquete con pip: {pip_res.stderr}[/bold red]")
+    except Exception as e:
+        console.print(f"[bold red][!] Error durante la actualización: {e}[/bold red]")
+
+
+@app.command(name="update", help="🔄 Actualiza automáticamente Blood-Cipher desde GitHub.")
+def update_command():
+    """Actualiza Blood-Cipher a la última versión."""
+    perform_system_update()
+
+
+
 def _get_windows_clipboard_text() -> Optional[str]:
     """Obtiene el texto actual del portapapeles de Windows de forma directa mediante la API Win32."""
     if os.name != "nt":
@@ -449,24 +493,28 @@ def chat(
             elif cleaned_cmd in ["teclado", "keyboard", "idioma", "layout"]:
                 interactive_keyboard_menu()
                 continue
+            elif cleaned_cmd in ["update", "actualizar", "actualiza", "upgrade"]:
+                perform_system_update()
+                continue
             elif cleaned_cmd in ["vulns", "vulnerabilidades", "scan"]:
                 console.print("[bold cyan][*] Usa 'blood-cipher audit vulns <target>' desde la terminal o escribe tu solicitud de auditoría aquí.[/bold cyan]")
                 continue
             elif cleaned_cmd in ["ayuda", "help", "?"]:
                 console.print("""
 [bold cyan]🎮 Comandos Rápidos e Interactivos del Chat:[/bold cyan]
-  [bold green]inicio / menu[/bold green]   - Redibujar la interfaz y el banner táctico principal
-  [bold green]ver <archivo>[/bold green]   - Ver contenido de archivos .txt, .log, .json con colores
-  [bold green]teclado[/bold green]         - Cambiar distribución del teclado a Perú / Latam / ES al instante
-  [bold green]logs[/bold green]            - Inspeccionar logs del sistema y de conexiones VPN
-  [bold green]vpn / ip / anon[/bold green] - Gestor táctico Multi-VPN, comprobación de IP y OPSEC
-  [bold green]scope / sow[/bold green]     - Cambiar, crear o importar un nuevo objetivo/alcance (SOW)
-  [bold green]config / model[/bold green]  - Cambiar de modelo de IA o API Key al vuelo sin reiniciar
-  [bold green]historial[/bold green]       - Listar y cambiar entre sesiones de chat anteriores
-  [bold green]new / nuevo[/bold green]     - Iniciar un nuevo chat limpio
-  [bold green]clear[/bold green]           - Limpiar la pantalla de la terminal
-  [bold green]exit / salir[/bold green]    - Guardar y salir de Blood-Cipher
-  [bold cyan]Ctrl + C[/bold cyan]        - Cancelar acción actual / Regresar al menú anterior
+  [bold green]update / actualizar[/bold green] - Descargar e instalar todas las actualizaciones automáticamente
+  [bold green]inicio / home[/bold green]       - Redibujar la interfaz y el banner táctico principal
+  [bold green]historial / history[/bold green] - Listar, cambiar y reanudar sesiones de chat anteriores
+  [bold green]ver <archivo>[/bold green]       - Ver contenido de archivos .txt, .log, .json con colores
+  [bold green]teclado[/bold green]             - Cambiar distribución del teclado a Perú / Latam / ES al instante
+  [bold green]logs[/bold green]                - Inspeccionar logs del sistema y de conexiones VPN
+  [bold green]vpn / ip / anon[/bold green]     - Gestor táctico Multi-VPN, comprobación de IP y OPSEC
+  [bold green]scope / sow[/bold green]         - Cambiar, crear o importar un nuevo objetivo/alcance (SOW)
+  [bold green]config / model[/bold green]      - Cambiar de modelo de IA o API Key al vuelo sin reiniciar
+  [bold green]new / nuevo[/bold green]         - Iniciar un nuevo chat limpio
+  [bold green]clear[/bold green]               - Limpiar la pantalla de la terminal
+  [bold green]exit / salir[/bold green]        - Guardar y salir de Blood-Cipher
+  [bold cyan]Ctrl + C[/bold cyan]            - Cancelar acción actual / Regresar al menú anterior
                 """)
                 continue
 
