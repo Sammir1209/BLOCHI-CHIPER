@@ -392,15 +392,32 @@ class SystemExecutor:
                 encoding="utf-8",
                 errors="replace",
                 cwd=cwd,
+                bufsize=1,
             )
-            stdout, stderr = process.communicate(timeout=600)
-            combined_output = []
-            if stdout:
-                combined_output.append(stdout.strip())
-            if stderr:
-                combined_output.append(f"[STDERR]\n{stderr.strip()}")
 
-            final_output = "\n".join(combined_output).strip()
+            captured_lines = []
+            console.print(f"[dim cyan]┌─ Salida en vivo de: [bold yellow]{cmd}[/bold yellow][/dim cyan]")
+
+            # Leer stdout en tiempo real sin bloquear la interfaz
+            while True:
+                line = process.stdout.readline()
+                if not line and process.poll() is not None:
+                    break
+                if line:
+                    stripped = line.rstrip("\r\n")
+                    captured_lines.append(stripped)
+                    # Imprimir línea en tiempo real con indentación táctica
+                    console.print(f"[dim cyan]│[/dim cyan] {stripped}")
+                    sys.stdout.flush()
+
+            stderr_out = process.stderr.read()
+            if stderr_out and stderr_out.strip():
+                captured_lines.append(f"[STDERR]\n{stderr_out.strip()}")
+                console.print(f"[dim red]│ [STDERR] {stderr_out.strip()}[/dim red]")
+
+            console.print(f"[dim cyan]└─ Ejecución completada (Código {process.returncode})[/dim cyan]")
+
+            final_output = "\n".join(captured_lines).strip()
             if not final_output:
                 final_output = "[Comando ejecutado con éxito (código de salida 0), sin salida estándar]"
 
@@ -436,18 +453,32 @@ class SystemExecutor:
             )
 
     def write_file(self, target_path: str, content: str, cwd: Optional[str] = None) -> ExecutionResult:
-        """Crea o sobrescribe un archivo en el sistema de archivos."""
+        """Crea o sobrescribe un archivo en el sistema de archivos mostrando avance visual en tiempo real."""
         try:
             p = Path(target_path).expanduser()
             if not p.is_absolute() and cwd:
                 path_obj = (Path(cwd) / p).resolve()
             else:
                 path_obj = p.resolve()
-            # Crear directorios padres si no existen
             path_obj.parent.mkdir(parents=True, exist_ok=True)
+
+            # Render de código visual en tiempo real
+            ext = path_obj.suffix.lstrip(".") or "py"
+            console.print()
+            console.print(f"[bold magenta]📝 Escribiendo archivo/código:[/bold magenta] [bold cyan]{path_obj}[/bold cyan]")
+            
+            lines = content.splitlines()
+            if len(lines) <= 30:
+                preview_code = content
+            else:
+                preview_code = "\n".join(lines[:22]) + f"\n\n... [{len(lines)-27} líneas intermedias omitidas ...] \n\n" + "\n".join(lines[-5:])
+
+            syntax = Syntax(preview_code, ext, theme="monokai", word_wrap=True, line_numbers=True)
+            console.print(Panel(syntax, border_style="bright_magenta", box=ROUNDED, padding=(0, 2)))
+
             path_obj.write_text(content, encoding="utf-8")
 
-            msg = f"[✓] Archivo '{path_obj}' escrito exitosamente ({len(content.encode('utf-8'))} bytes)."
+            msg = f"[✓] Archivo '{path_obj}' escrito exitosamente ({len(content.encode('utf-8'))} bytes, {len(lines)} líneas)."
             return ExecutionResult(
                 success=True,
                 output=msg,
