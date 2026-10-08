@@ -398,6 +398,9 @@ class KaliAgent:
                             import re
                             cleaned_attempt = re.sub(r'<think>[\s\S]*?</think>', '', ai_content, flags=re.IGNORECASE).strip()
                             cleaned_attempt = re.sub(r'```(?:thought|thinking|reasoning)[\s\S]*?```', '', cleaned_attempt, flags=re.IGNORECASE).strip()
+                            # Filtrar monólogos internos de razonamiento en inglés (ej: "Okay, let's see...", "Looking at the history...")
+                            if re.match(r'^(?:Okay|Alright|Let\'s see|The user|Looking at the|In the previous|Wait, the user|First, they want)', cleaned_attempt, flags=re.IGNORECASE):
+                                cleaned_attempt = re.sub(r'^(?:Okay|Alright|Let\'s see|The user|Looking at the|In the previous|Wait, the user|First, they want)[\s\S]*?(?=<ejecutar_comando>|<escribir_archivo>|\n\n[A-ZÁÉÍÓÚÑ]|\n\n```)', '', cleaned_attempt, flags=re.IGNORECASE).strip()
                             if cleaned_attempt:
                                 ai_content = cleaned_attempt
                             else:
@@ -499,15 +502,16 @@ class KaliAgent:
                                 time.sleep(wait_seconds)
                                 continue
                         
-                        # Si es un error de timeout / conexión temporal / backend proxy / sobrecarga del proveedor
+                        # Si es un error de timeout / conexión temporal / DNS / backend proxy / sobrecarga del proveedor
                         if any(term in err_str.lower() for term in [
                             "context deadline exceeded", "client.timeout", "timed out", "504", "503", "502", "500",
                             "upstream_failure", "temporarily overloaded", "internal server error",
-                            "connection aborted", "remotedisconnected", "remote end closed connection", "connection reset"
+                            "connection aborted", "remotedisconnected", "remote end closed connection", "connection reset",
+                            "nameresolutionerror", "failed to resolve", "temporary failure in name resolution", "gaierror"
                         ]):
                             retry_count += 1
                             if retry_count < max_retries:
-                                console.print(f"[yellow][!] El proveedor {provider.upper()} reportó sobrecarga/desconexión temporal. Reintentando ({retry_count}/{max_retries})...[/yellow]")
+                                console.print(f"[yellow][!] Re-conectando DNS/Red con {provider.upper()} (Reintento {retry_count}/{max_retries})...[/yellow]")
                                 import time
                                 time.sleep(3 + retry_count * 2)
                                 continue

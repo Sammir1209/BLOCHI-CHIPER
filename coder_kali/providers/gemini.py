@@ -83,6 +83,28 @@ class GeminiProvider(BaseLLMProvider):
                     url = f"{self.BASE_URL}/{clean_model}:generateContent?key={next_key.strip()}"
                     resp = requests.post(url, json=payload, timeout=90)
 
+            if resp.status_code in [503, 502, 504] or "UNAVAILABLE" in resp.text or "capacity" in resp.text.lower():
+                fallback_models = ["gemini-2.0-flash", "gemini-1.5-flash"]
+                for fb in fallback_models:
+                    if fb != clean_model:
+                        fb_url = f"{self.BASE_URL}/{fb}:generateContent?key={api_key.strip()}"
+                        try:
+                            fb_resp = requests.post(fb_url, json=payload, timeout=30)
+                            if fb_resp.status_code == 200:
+                                data = fb_resp.json()
+                                candidates = data.get("candidates", [])
+                                if candidates:
+                                    first = candidates[0]
+                                    parts = first.get("content", {}).get("parts", [])
+                                    content_text = "".join(part.get("text", "") for part in parts)
+                                    return LLMResponse(
+                                        content=content_text,
+                                        raw_response=data,
+                                        success=True,
+                                    )
+                        except Exception:
+                            continue
+
             if resp.status_code != 200:
                 err_text = resp.text
                 if resp.status_code == 400:
