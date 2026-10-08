@@ -21,5 +21,7 @@ __all__ = [
     "render_error",
     "render_info",
     "render_system_status",
+    "render_agent_cooperation",
+    "render_background_action",
     "console",
 ]

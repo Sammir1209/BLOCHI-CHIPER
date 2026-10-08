@@ -226,6 +226,37 @@ def render_info(message: str):
     console.print(f"[bold cyan][*][/bold cyan] [white]{message}[/white]")
 
 
+def render_agent_cooperation(agent_role: str, agent_name: str, message: str):
+    """Muestra la intervención de un sub-agente táctico especializado (ej. Recon, Exploit, Auditor)."""
+    console.print()
+    badge = Text(f" 🤝 ENLACE MULTI-AGENTE: {agent_role.upper()} [{agent_name}] ", style="bold black on bright_yellow")
+    console.print(badge)
+    panel = Panel(
+        Text(message, style="bold bright_white"),
+        title=f"[bold yellow]⚡ {agent_name} en operación coordinada[/bold yellow]",
+        border_style="yellow",
+        box=ROUNDED,
+        padding=(0, 2),
+    )
+    console.print(panel)
+
+
+def render_background_action(action_type: str, detail: str, status: str = "PROCESANDO EN SEGUNDO PLANO"):
+    """Muestra un indicador estilizado de procesamiento en segundo plano."""
+    console.print()
+    border_color = "bright_blue"
+    badge_title = f"[bold cyan]⚡ {status}[/bold cyan]"
+    content = f"[bold white]{action_type}:[/bold white] [bright_cyan]{detail}[/bright_cyan]\n[dim](El sistema sigue ejecutando en background. La terminal está protegida contra entradas accidentales)[/dim]"
+    panel = Panel(
+        content,
+        title=badge_title,
+        border_style=border_color,
+        box=ROUNDED,
+        padding=(0, 2),
+    )
+    console.print(panel)
+
+
 def render_system_status(status_dict: dict):
     """Renderiza una tabla con el estado del sistema y herramientas de diagnóstico."""
     table = Table(title="📊 Estado de Blood-Cipher", box=ROUNDED, border_style="cyan")

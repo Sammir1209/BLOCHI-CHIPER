@@ -424,6 +424,25 @@ DEFAULT_PROVIDERS = {
         "requires_api_key": True,
         "default_api_base": "https://api.plugsky.com/v1",
     },
+    "hive": {
+        "name": "Hive AI (thehive.ai - V3 Clusters sf1/va1)",
+        "default_model": "deepseek-ai/deepseek-v4.1-flash",
+        "available_models": [
+            "deepseek-ai/deepseek-v4.1-flash",
+            "deepseek-ai/deepseek-v3",
+            "deepseek-ai/deepseek-r1",
+            "meta-llama/llama-3.3-70b-instruct",
+            "hive/vision-language-model",
+            "qwen/qwen-2.5-coder-32b",
+        ],
+        "free_models": [
+            "deepseek-ai/deepseek-v4.1-flash",
+            "deepseek-ai/deepseek-v3",
+        ],
+        "env_var": "HIVE_API_KEY",
+        "requires_api_key": True,
+        "default_api_base": "https://api.thehive.ai/api/v3",
+    },
 }
 
 DEFAULT_CONFIG: Dict[str, Any] = {

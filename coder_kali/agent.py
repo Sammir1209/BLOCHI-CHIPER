@@ -23,6 +23,8 @@ from coder_kali.ui.chat_render import (
     render_ai_message,
     render_execution_result,
     render_error,
+    render_agent_cooperation,
+    render_background_action,
 )
 
 console = Console()
@@ -261,7 +263,7 @@ class KaliAgent:
         configured_max = self.config_mgr.get("max_tokens", 4096)
         if provider == "groq":
             max_tokens = min(configured_max, 1024)
-        elif provider in ["bai", "aimlapi", "openai", "anthropic", "openrouter", "gemini"]:
+        elif provider in ["bai", "aimlapi", "openai", "anthropic", "openrouter", "gemini", "puter", "bazaarlink", "hive"]:
             max_tokens = max(configured_max, 4096)
         else:
             max_tokens = configured_max
@@ -342,7 +344,7 @@ class KaliAgent:
                             max_tokens = min(configured_max, 1024)
                         elif provider == "plugsky":
                             max_tokens = min(configured_max, 2048)
-                        elif provider in ["bai", "aimlapi", "openai", "anthropic", "openrouter", "gemini", "puter", "bazaarlink"]:
+                        elif provider in ["bai", "aimlapi", "openai", "anthropic", "openrouter", "gemini", "puter", "bazaarlink", "hive"]:
                             max_tokens = max(configured_max, 4096)
                         else:
                             max_tokens = configured_max
@@ -551,6 +553,11 @@ class KaliAgent:
                 workspace_dir = getattr(self.current_session, "workspace_path", None)
                 if not workspace_dir:
                     workspace_dir = str(self.session_mgr.get_session_workspace(self.current_session.id))
+
+                # Indicador de operación en background en vivo
+                is_bg = (action.action_type == "command" and (action.content.strip().endswith("&") or "nohup" in action.content or "run_background" in action.content))
+                if is_bg:
+                    render_background_action("TAREA EN SEGUNDO PLANO", action.content)
 
                 result = self.executor.process_action(action, cwd=workspace_dir)
                 render_execution_result(result, command=action.content if action.action_type == "command" else None)
