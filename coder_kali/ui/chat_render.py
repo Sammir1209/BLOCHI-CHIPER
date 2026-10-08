@@ -79,19 +79,17 @@ def print_banner(version: str = "2.0.0", provider: str = "gemini", model: str = 
 
 
 def render_user_message(message: str):
-    """Renderiza el mensaje del operador con estilo táctico adaptado al SO."""
+    """Renderiza el mensaje del operador con estilo CLI minimalista y elegante."""
     import platform
     is_windows = platform.system() == "Windows"
 
     console.print()
-    badge_style = "bold black on bright_cyan" if is_windows else "bold black on bright_green"
-    border_style = "bright_cyan" if is_windows else "bright_green"
-
-    badge = Text(" ⚡ OPERADOR (WINDOWS) " if is_windows else " ⚡ OPERADOR (KALI) ", style=badge_style)
+    badge_title = "❯ OPERADOR (WINDOWS)" if is_windows else "❯ OPERADOR (KALI)"
+    badge = Text(f" {badge_title} ", style="bold white on #1e293b")
     console.print(badge)
     panel = Panel(
         Text(message, style="bold white"),
-        border_style=border_style,
+        border_style="#38bdf8" if is_windows else "#4ade80",
         box=ROUNDED,
         padding=(0, 2),
     )
@@ -99,7 +97,7 @@ def render_user_message(message: str):
 
 
 def render_ai_message(message: str):
-    """Renderiza la respuesta directa de Blood-Cipher en formato Markdown de élite."""
+    """Renderiza la respuesta directa de Blood-Cipher en formato Markdown de élite con estética Claude/Gemini."""
     import re
     import platform
     is_windows = platform.system() == "Windows"
@@ -126,16 +124,16 @@ def render_ai_message(message: str):
             xml_cmds = re.findall(r'<ejecutar_comando>([\s\S]*?)(?:</ejecutar_comando>|$)', message, flags=re.IGNORECASE)
         if xml_cmds:
             cmd_lines = [c.strip().split('\n')[0] for c in xml_cmds if c.strip()]
-            cleaned_text = "⚡ **Ejecutando operaciones tácticas:**\n" + "\n".join([f"- `{cmd}`" for cmd in cmd_lines[:6]])
+            cleaned_text = "⚡ **Acciones Tácticas en Proceso:**\n" + "\n".join([f"- `{cmd}`" for cmd in cmd_lines[:6]])
         else:
             return
 
     console.print()
-    header_title = " 🤖 BLOOD-CIPHER [WINDOWS TACTICAL AI] " if is_windows else " 🤖 BLOOD-CIPHER [KALI TACTICAL AI] "
-    header_style = "bold black on deep_sky_blue1" if is_windows else "bold black on bright_cyan"
-    border_style = "deep_sky_blue1" if is_windows else "bright_cyan"
+    header_title = "✦ BLOOD-CIPHER [WINDOWS COPILOT]" if is_windows else "✦ BLOOD-CIPHER [KALI COPILOT]"
+    header_style = "bold white on #0284c7" if is_windows else "bold white on #059669"
+    border_style = "#0ea5e9" if is_windows else "#10b981"
 
-    header = Text(header_title, style=header_style)
+    header = Text(f" {header_title} ", style=header_style)
     console.print(header)
 
     md = Markdown(cleaned_text, code_theme="monokai", hyperlinks=True)
