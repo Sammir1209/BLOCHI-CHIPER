@@ -322,13 +322,36 @@ class SystemExecutor:
         else:
             return self._execute_standard(cmd, cwd=cwd)
 
+    def _get_execution_env(self) -> Dict[str, str]:
+        """Construye un entorno de ejecución enriquecido garantizando PATH a Go y binarios de seguridad."""
+        env = os.environ.copy()
+        if self.is_linux:
+            home = env.get("HOME", "/root")
+            extra_paths = [
+                f"{home}/go/bin",
+                "/usr/local/go/bin",
+                f"{home}/.local/bin",
+                "/usr/local/bin",
+                "/usr/bin",
+                "/bin",
+                "/usr/local/sbin",
+                "/usr/sbin",
+                "/sbin",
+            ]
+            curr_path = env.get("PATH", "")
+            for p in extra_paths:
+                if p not in curr_path.split(":"):
+                    curr_path = f"{p}:{curr_path}"
+            env["PATH"] = curr_path
+        return env
+
     def _execute_linux_pty(self, cmd: str, cwd: Optional[str] = None) -> ExecutionResult:
         """Ejecuta en Linux usando PTY o pexpect para permitir interacción segura con sudo."""
         try:
             import pexpect
 
-            # Ejecutar a través del shell dinámico resuelto
-            child = pexpect.spawn(self.shell_path, ["-c", cmd], encoding="utf-8", timeout=600, cwd=cwd)
+            # Ejecutar a través del shell dinámico resuelto con PATH enriquecido
+            child = pexpect.spawn(self.shell_path, ["-c", cmd], env=self._get_execution_env(), encoding="utf-8", timeout=600, cwd=cwd)
             output_chunks = []
 
             # Dejar que el usuario interactúe directamente si pide contraseña
@@ -409,6 +432,7 @@ class SystemExecutor:
                     text=True,
                     close_fds=True,
                     cwd=cwd,
+                    env=self._get_execution_env(),
                 )
                 pid_info = process.pid
                 return ExecutionResult(
@@ -427,6 +451,7 @@ class SystemExecutor:
                 encoding="utf-8",
                 errors="replace",
                 cwd=cwd,
+                env=self._get_execution_env(),
                 bufsize=1,
             )
 
