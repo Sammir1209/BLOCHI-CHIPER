@@ -62,13 +62,20 @@ class GeminiProvider(BaseLLMProvider):
             "generationConfig": {
                 "temperature": float(temperature),
                 "maxOutputTokens": int(max_tokens),
-            }
+            },
+            "safetySettings": [
+                {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
+                {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
+                {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
+                {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
+                {"category": "HARM_CATEGORY_CIVIC_INTEGRITY", "threshold": "BLOCK_NONE"},
+            ]
         }
         if system_instruction:
             payload["system_instruction"] = system_instruction
 
         try:
-            resp = requests.post(url, json=payload, timeout=90)
+            resp = requests.post(url, json=payload, timeout=45)
             
             if resp.status_code == 429:
                 next_key = self.config_mgr.rotate_api_key("gemini")
