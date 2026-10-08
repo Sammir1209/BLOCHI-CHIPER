@@ -516,3 +516,49 @@ class SystemExecutor:
             output="[ERROR] Tipo de acción desconocido.",
             returncode=1,
         )
+
+    def execute_actions_parallel(self, actions: List[ParsedAction], cwd: Optional[str] = None, max_workers: int = 4) -> List[Tuple[ParsedAction, ExecutionResult]]:
+        """Ejecuta múltiples acciones en paralelo de forma eficiente usando subprocesos aislados."""
+        import concurrent.futures
+
+        file_actions = [a for a in actions if a.action_type == "file"]
+        cmd_actions = [a for a in actions if a.action_type == "command"]
+
+        results: List[Tuple[ParsedAction, ExecutionResult]] = []
+
+        # 1. Escribir archivos primero secuencialmente
+        for fa in file_actions:
+            res = self.process_action(fa, cwd=cwd)
+            results.append((fa, res))
+            if res.was_rejected:
+                return results
+
+        # 2. Si no hay comandos o solo hay 1, ejecutar de forma estándar
+        if len(cmd_actions) <= 1:
+            for ca in cmd_actions:
+                res = self.process_action(ca, cwd=cwd)
+                results.append((ca, res))
+            return results
+
+        # 3. Si hay múltiples comandos, ejecutarlos en paralelo
+        console.print(f"[bold cyan][⚡ PARALELO] Ejecutando {len(cmd_actions)} tareas/comandos en simultáneo...[/bold cyan]")
+        with concurrent.futures.ThreadPoolExecutor(max_workers=min(len(cmd_actions), max_workers)) as executor:
+            future_to_action = {
+                executor.submit(self.process_action, ca, cwd): ca
+                for ca in cmd_actions
+            }
+            for future in concurrent.futures.as_completed(future_to_action):
+                ca = future_to_action[future]
+                try:
+                    res = future.result()
+                except Exception as e:
+                    res = ExecutionResult(
+                        success=False,
+                        output=f"[ERROR PARALELO] Excepción durante la ejecución: {str(e)}",
+                        returncode=1,
+                        command=ca.content,
+                    )
+                results.append((ca, res))
+
+        return results
+

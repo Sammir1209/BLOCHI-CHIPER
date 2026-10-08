@@ -540,26 +540,14 @@ class KaliAgent:
             results_feedback = []
             should_stop = False
 
-            for action in actions:
-                if self.on_status_update:
-                    try:
-                        if action.action_type == "command":
-                            self.on_status_update(f"Ejecutando: {action.content}")
-                        else:
-                            self.on_status_update(f"Escribiendo archivo: {action.target_path}")
-                    except Exception:
-                        pass
+            workspace_dir = getattr(self.current_session, "workspace_path", None)
+            if not workspace_dir:
+                workspace_dir = str(self.session_mgr.get_session_workspace(self.current_session.id))
 
-                workspace_dir = getattr(self.current_session, "workspace_path", None)
-                if not workspace_dir:
-                    workspace_dir = str(self.session_mgr.get_session_workspace(self.current_session.id))
+            # Ejecutar acciones en paralelo si hay múltiples comandos
+            action_results = self.executor.execute_actions_parallel(actions, cwd=workspace_dir)
 
-                # Indicador de operación en background en vivo
-                is_bg = (action.action_type == "command" and (action.content.strip().endswith("&") or "nohup" in action.content or "run_background" in action.content))
-                if is_bg:
-                    render_background_action("TAREA EN SEGUNDO PLANO", action.content)
-
-                result = self.executor.process_action(action, cwd=workspace_dir)
+            for action, result in action_results:
                 render_execution_result(result, command=action.content if action.action_type == "command" else None)
 
                 if self.on_action_update:
@@ -576,7 +564,6 @@ class KaliAgent:
                         pass
 
                 if action.action_type == "command":
-                    # Truncar salidas de terminal largas para evitar reventar límites TPM de Groq
                     cmd_output = result.output or ""
                     output_lines = cmd_output.split('\n')
                     if len(output_lines) > 80:
@@ -597,7 +584,6 @@ class KaliAgent:
 
                 results_feedback.append(feedback_str)
 
-                # Si el usuario rechazó el comando, no ejecutar los subsecuentes del mismo paso
                 if result.was_rejected:
                     should_stop = True
                     break
