@@ -324,6 +324,15 @@ class KaliAgent:
         if tool_context:
             augmented_user_message = f"{user_text}\n\n{tool_context}"
 
+        # Si el operador usa palabras clave de orden de ejecución directa
+        lowered_txt = user_text.lower().strip()
+        if lowered_txt in ["ejecutalos", "ejecútalos", "ejecuta", "continua", "continuemos", "continuemo", "hazlo", "dale", "si", "sí", "corre los comandos"]:
+            augmented_user_message += (
+                "\n\n[DIRECTIVA TÁCTICA DE EJECUCIÓN INMEDIATA]\n"
+                "El operador autoriza y ordena la ejecución directa de todos los comandos e instalaciones necesarias. "
+                "EMITE DE INMEDIATO los bloques de acción XML (<ejecutar_comando> o <escribir_archivo>) sin dar más explicaciones de texto."
+            )
+
         self.messages.append({"role": "user", "content": augmented_user_message})
 
         iterations = 0

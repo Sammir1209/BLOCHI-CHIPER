@@ -213,6 +213,40 @@ class SystemExecutor:
             except Exception:
                 continue
 
+        # 4. FALLBACK: Si el modelo no usó XML ni JSON pero incluyó un bloque de código Markdown (```bash ... ```)
+        if not cmd_actions:
+            markdown_code_regex = re.compile(r'```(?:bash|sh|shell|console|zsh)?\s*\n([\s\S]*?)\n```', re.IGNORECASE)
+            for match in markdown_code_regex.finditer(cleaned_text):
+                raw_code = match.group(1).strip()
+                if not raw_code or raw_code in seen_commands:
+                    continue
+                lines = [l.strip() for l in raw_code.splitlines() if l.strip() and not l.strip().startswith('#')]
+                if not lines:
+                    continue
+                valid_cmds = []
+                for line in lines:
+                    # Omitir etiquetas falsas o instructivos
+                    if line.startswith(('<', '</', '```', 'http://', 'https://')):
+                        continue
+                    if any(line.startswith(prefix) or f" {prefix} " in f" {line} " for prefix in [
+                        'sudo', 'apt', 'pip', 'pip3', 'python', 'python3', 'go', 'httpx', 'httpx-toolkit',
+                        'nmap', 'curl', 'wget', 'chmod', 'chown', 'mkdir', 'git', 'cd', 'cat', 'subfinder',
+                        'ffuf', 'gobuster', 'sqlmap', 'nuclei', 'wpscan', 'hydra', 'john', 'msfconsole', 'echo'
+                    ]):
+                        valid_cmds.append(line)
+                if valid_cmds:
+                    cmd_str = "\n".join(valid_cmds).strip()
+                    if cmd_str and cmd_str not in seen_commands:
+                        seen_commands.add(cmd_str)
+                        cmd_actions.append(
+                            ParsedAction(
+                                action_type="command",
+                                content=cmd_str,
+                                is_sudo=bool(re.search(r"\bsudo\b", cmd_str)),
+                                is_dangerous=any(re.search(pat, cmd_str) for pat in CRITICAL_PATTERNS),
+                            )
+                        )
+
         # SIEMPRE retornar primero la creación de archivos y luego los comandos
         return file_actions + cmd_actions
 
