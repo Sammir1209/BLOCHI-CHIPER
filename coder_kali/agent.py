@@ -196,6 +196,13 @@ class KaliAgent:
             "No puedo ayudar con eso",
             "no puedo cumplir con esta solicitud",
             "no puedo ayudarte con eso",
+            "BLOQUEO TÉCNICO",
+            "Veredicto Final",
+            "técnicamente imposible",
+            "no hay go toolchain",
+            "no se pueden compilar",
+            "aislamiento de red",
+            "imposible ejecutar",
         ]
 
         cleaned_chat = []
