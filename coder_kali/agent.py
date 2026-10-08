@@ -504,14 +504,14 @@ class KaliAgent:
                         
                         # Si es un error de timeout / conexión temporal / DNS / backend proxy / sobrecarga del proveedor
                         if any(term in err_str.lower() for term in [
-                            "context deadline exceeded", "client.timeout", "timed out", "504", "503", "502", "500",
+                            "context deadline exceeded", "client.timeout", "timed out", "timeout", "timeout de conexión", "504", "503", "502", "500",
                             "upstream_failure", "temporarily overloaded", "internal server error",
                             "connection aborted", "remotedisconnected", "remote end closed connection", "connection reset",
                             "nameresolutionerror", "failed to resolve", "temporary failure in name resolution", "gaierror"
                         ]):
                             retry_count += 1
                             if retry_count < max_retries:
-                                console.print(f"[yellow][!] Re-conectando DNS/Red con {provider.upper()} (Reintento {retry_count}/{max_retries})...[/yellow]")
+                                console.print(f"[yellow][!] Re-conectando con {provider.upper()} (Reintento {retry_count}/{max_retries})...[/yellow]")
                                 import time
                                 time.sleep(3 + retry_count * 2)
                                 continue

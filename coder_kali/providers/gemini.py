@@ -20,6 +20,11 @@ class GeminiProvider(BaseLLMProvider):
         m = model.strip()
         if m.lower().startswith("gemini/"):
             m = m[len("gemini/"):]
+        # Los nombres válidos oficiales en la REST API de Google son: gemini-2.0-flash, gemini-1.5-flash, gemini-1.5-pro.
+        # Nombres como 2.5-flash o 3.6-flash no existen en la API y provocan error 503 / Timeout.
+        valid_models = ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro", "gemini-2.0-flash-lite", "gemini-2.0-pro-exp-02-05"]
+        if m not in valid_models:
+            return "gemini-2.0-flash"
         return m
 
     def _format_messages(self, messages: List[Dict[str, str]]) -> Tuple[Optional[Dict[str, Any]], List[Dict[str, Any]]]:
