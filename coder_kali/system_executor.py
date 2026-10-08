@@ -17,6 +17,7 @@ from rich.panel import Panel
 from rich.prompt import Confirm
 from rich.syntax import Syntax
 from rich.text import Text
+from rich.box import ROUNDED
 
 import shutil
 import tempfile

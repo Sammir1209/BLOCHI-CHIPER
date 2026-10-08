@@ -52,9 +52,10 @@ class OpenRouterProvider(BaseLLMProvider):
 
         try:
             current_max_tokens = int(max_tokens)
-            resp = requests.post(self.API_URL, json=payload, headers=headers, timeout=120)
+            # Timeout optimizado a 35s para evitar congelamientos en colas de OpenRouter
+            resp = requests.post(self.API_URL, json=payload, headers=headers, timeout=35)
             if resp.status_code == 402:
-                # OpenRouter error 402: "This request requires more credits, or fewer max_tokens. You requested up to 4096 tokens, but can only afford 2097..."
+                # OpenRouter error 402: "This request requires more credits, or fewer max_tokens..."
                 import re
                 err_text = resp.text
                 match = re.search(r"can only afford\s+(\d+)", err_text, re.IGNORECASE)
@@ -62,7 +63,7 @@ class OpenRouterProvider(BaseLLMProvider):
                     affordable = int(match.group(1))
                     if affordable > 100:
                         payload["max_tokens"] = affordable - 20
-                        resp = requests.post(self.API_URL, json=payload, headers=headers, timeout=120)
+                        resp = requests.post(self.API_URL, json=payload, headers=headers, timeout=35)
 
             if resp.status_code != 200:
                 err_text = resp.text
@@ -73,11 +74,30 @@ class OpenRouterProvider(BaseLLMProvider):
                     )
                 if resp.status_code == 402:
                     return LLMResponse(
-                        error="Créditos insuficientes en OpenRouter para este modelo de pago. Puedes recargar en https://openrouter.ai/settings/credits o cambiar a un modelo gratuito como 'deepseek/deepseek-chat:free' o 'google/gemini-2.0-flash-exp:free'.",
+                        error="Créditos insuficientes en OpenRouter para este modelo de pago. Cambia a un modelo ultrarrápido gratuito ejecutando 'config' y seleccionando 'meta-llama/llama-3.3-70b-instruct:free' o 'google/gemini-2.0-flash-exp:free'.",
                         success=False,
                     )
                 if resp.status_code == 429:
-                    return LLMResponse(error="Rate limit excedido en OpenRouter.", success=False)
+                    # Si el modelo gratuito lento (ej. nemotron) saturó el rate limit, reintentar automáticamente con Llama 3.3 70b free o Gemini Flash free
+                    fast_fallbacks = ["meta-llama/llama-3.3-70b-instruct:free", "google/gemini-2.0-flash-exp:free", "deepseek/deepseek-chat:free"]
+                    if clean_model not in fast_fallbacks:
+                        for fb in fast_fallbacks:
+                            payload["model"] = fb
+                            try:
+                                fb_resp = requests.post(self.API_URL, json=payload, headers=headers, timeout=20)
+                                if fb_resp.status_code == 200:
+                                    data = fb_resp.json()
+                                    choice = data.get("choices", [{}])[0]
+                                    msg_obj = choice.get("message", {})
+                                    content = msg_obj.get("content", "") or ""
+                                    return LLMResponse(
+                                        content=f"[⚡ Modelo alternativo ultrarrápido '{fb}' activado automáticamente por sobrecarga]\n\n" + content,
+                                        raw_response=data,
+                                        success=True,
+                                    )
+                            except Exception:
+                                continue
+                    return LLMResponse(error="Rate limit excedido en OpenRouter. Cambia de modelo en 'config'.", success=False)
                 return LLMResponse(error=f"Error en OpenRouter ({resp.status_code}): {err_text}", success=False)
 
             data = resp.json()
@@ -95,7 +115,26 @@ class OpenRouterProvider(BaseLLMProvider):
                 success=True,
             )
         except requests.exceptions.Timeout:
-            return LLMResponse(error="Timeout de conexión con OpenRouter.", success=False)
+            # Reintento rápido en modelos ultrarrápidos gratuitos si el modelo actual estuvo colgado en cola
+            fast_fallbacks = ["meta-llama/llama-3.3-70b-instruct:free", "google/gemini-2.0-flash-exp:free"]
+            if clean_model not in fast_fallbacks:
+                for fb in fast_fallbacks:
+                    payload["model"] = fb
+                    try:
+                        fb_resp = requests.post(self.API_URL, json=payload, headers=headers, timeout=20)
+                        if fb_resp.status_code == 200:
+                            data = fb_resp.json()
+                            choice = data.get("choices", [{}])[0]
+                            msg_obj = choice.get("message", {})
+                            content = msg_obj.get("content", "") or ""
+                            return LLMResponse(
+                                content=f"[⚡ Conectado con '{fb}' tras timeout en la cola del modelo previo]\n\n" + content,
+                                raw_response=data,
+                                success=True,
+                            )
+                    except Exception:
+                        continue
+            return LLMResponse(error="Timeout de conexión con OpenRouter (la cola del modelo demoró demasiado). Cambia de modelo con 'config'.", success=False)
         except Exception as e:
             return LLMResponse(error=f"Excepción en OpenRouter: {str(e)}", success=False)
 
