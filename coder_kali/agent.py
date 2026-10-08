@@ -121,10 +121,26 @@ class KaliAgent:
         if not workspace_dir:
             workspace_dir = str(self.session_mgr.get_session_workspace(self.current_session.id))
         
+        # Inspeccionar y listar archivos preexistentes en el workspace de esta sesión
+        workspace_files_summary = ""
+        try:
+            from pathlib import Path
+            ws_path = Path(workspace_dir)
+            if ws_path.exists():
+                files = [f for f in ws_path.glob("*") if f.is_file()]
+                if files:
+                    file_info = []
+                    for f in files:
+                        size_kb = round(f.stat().st_size / 1024, 2)
+                        file_info.append(f"  - {f.name} ({size_kb} KB)")
+                    workspace_files_summary = "\n- ARCHIVOS Y DATOS PREVIAMENTE GENERADOS EN ESTA SESIÓN:\n" + "\n".join(file_info)
+        except Exception:
+            pass
+
         prompt += f"""
 
 [DIRECTORIO DE TRABAJO DEDICADO DE LA SESIÓN]
-- Carpeta de la sesión: `{workspace_dir}`
+- Carpeta de la sesión: `{workspace_dir}`{workspace_files_summary}
 - REGLAS ESTRICTAS DE ORGANIZACIÓN Y SCRIPTING:
   * MENOS CHAT, MÁS ACCIÓN TÁCTICA EN TIEMPO REAL: No des explicaciones extensas ni te quedes conversando. Actúa emitiendo comandos directos `<ejecutar_comando>` y `<escribir_archivo>` en tiempo real desde el primer turno.
   * FOCO TÁCTICO INQUEBRANTABLE: Si hay un objetivo primario en curso (ej. dumping masivo de base de datos o extracción), NO te distraigas con búsquedas laterales ni cambies de tema. Mantén el foco 100% en completar el dump o extracción hasta el final.
@@ -218,7 +234,7 @@ class KaliAgent:
         # En Groq y Plugsky el tier gratuito tiene límites de contexto / TPM
         # por lo que mantenemos una ventana compacta de turnos recientes para evitar 429 / 503 continuos
         is_plugsky = provider == "plugsky"
-        max_history = 6 if is_groq else (12 if is_plugsky else 24)
+        max_history = 6 if is_groq else (16 if is_plugsky else 50)
         if len(cleaned_chat) > max_history:
             recent_msgs = [cleaned_chat[0]] + cleaned_chat[-(max_history - 1):]
         else:
