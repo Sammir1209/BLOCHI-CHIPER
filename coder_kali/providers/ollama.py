@@ -16,7 +16,7 @@ class OllamaProvider(BaseLLMProvider):
 
     def _clean_model_name(self, model: str) -> str:
         if not model:
-            return "llama3.2"
+            return "qwen2.5-coder:1.5b"
         m = model.strip()
         if m.lower().startswith("ollama/"):
             m = m[len("ollama/"):]
