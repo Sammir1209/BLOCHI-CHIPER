@@ -16,7 +16,7 @@ class OllamaProvider(BaseLLMProvider):
 
     def _clean_model_name(self, model: str) -> str:
         if not model:
-            return "qwen2.5-coder:1.5b"
+            return "wizardlm-uncensored:13b"
         m = model.strip()
         if m.lower().startswith("ollama/"):
             m = m[len("ollama/"):]
@@ -35,7 +35,7 @@ class OllamaProvider(BaseLLMProvider):
 
         if not client.is_online():
             return LLMResponse(
-                error=f"El servicio de Ollama no está activo en {client.host}. Inícialo con 'ollama serve'.",
+                error=f"El servicio de Ollama no está activo en {client.host}. Inícialo con 'systemctl start ollama' u 'ollama serve'.",
                 success=False,
             )
 
@@ -61,13 +61,28 @@ class OllamaProvider(BaseLLMProvider):
         clean_model = self._clean_model_name(model)
 
         if not client.is_online():
-            return False, f"El servicio de Ollama no está activo en {client.host}."
+            return False, f"El servicio de Ollama no está activo en {client.host}. Inícialo con 'systemctl start ollama' u 'ollama serve'."
+
+        local_models = client.list_local_models()
+        if local_models:
+            # Comprobar si el modelo o su versión con tag está descargado
+            installed = any(
+                m == clean_model or m.startswith(f"{clean_model}:") or clean_model.startswith(f"{m}:")
+                for m in local_models
+            )
+            if not installed:
+                return False, (
+                    f"El modelo '{clean_model}' no está descargado en tu Ollama local.\n"
+                    f"Modelos detectados: {', '.join(local_models)}\n"
+                    f"👉 Ejecuta en tu terminal: 'ollama pull {clean_model}' y reintenta."
+                )
 
         test_messages = [{"role": "user", "content": "Responde únicamente 'OK'"}]
         res = self.chat_completion(clean_model, test_messages, max_tokens=15)
         if res.success:
             return True, f"Conexión exitosa con Ollama ({clean_model}): {res.content.strip() or 'OK'}"
         return False, res.error or "Error al conectar con Ollama"
+
 
     def list_models(self) -> List[str]:
         client = self._get_client()

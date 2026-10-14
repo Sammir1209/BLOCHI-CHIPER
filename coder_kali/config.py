@@ -39,8 +39,9 @@ DEFAULT_PROVIDERS = {
 
     "ollama": {
         "name": "Ollama Local (100% Offline / Sin API Key)",
-        "default_model": "ollama/qwen2.5-coder:1.5b",
+        "default_model": "ollama/wizardlm-uncensored:13b",
         "available_models": [
+            "ollama/wizardlm-uncensored:13b",
             "ollama/qwen2.5-coder:1.5b",
             "ollama/qwen2.5-coder:7b",
             "ollama/deepseek-r1:1.5b",
@@ -49,6 +50,7 @@ DEFAULT_PROVIDERS = {
             "ollama/mistral",
         ],
         "free_models": [
+            "ollama/wizardlm-uncensored:13b",
             "ollama/qwen2.5-coder:1.5b",
             "ollama/qwen2.5-coder:7b",
             "ollama/deepseek-r1:1.5b",
@@ -60,6 +62,7 @@ DEFAULT_PROVIDERS = {
         "requires_api_key": False,
         "default_api_base": "http://localhost:11434",
     },
+
 
 
     "anthropic": {

@@ -679,9 +679,11 @@ def interactive_config_wizard(config_mgr: ConfigManager) -> bool:
         all_detected = live_models if live_models else list(prov_meta.get("available_models", []))
         free_models = config_mgr.get_free_models(chosen_provider)
 
-        # Preguntar si desea enrutamiento gratuito exclusivo o ver todos los modelos
-        filter_mode = "ALL"
-        if free_models:
+        # Para Ollama todos los modelos locales son 100% gratuitos y offline
+        if chosen_provider == "ollama":
+            filter_mode = "ALL"
+            model_choices = list(all_detected)
+        elif free_models:
             free_choice = questionary.select(
                 "¿Qué tipo de enrutamiento deseas utilizar?",
                 choices=[
@@ -699,13 +701,16 @@ def interactive_config_wizard(config_mgr: ConfigManager) -> bool:
             if free_choice:
                 filter_mode = free_choice
 
-        if filter_mode == "FREE":
-            model_choices = list(free_models)
-            console.print(f"[bold green][✓] Enrutamiento gratuito activado: Mostrando {len(model_choices)} modelos sin costo para {prov_meta['name']}.[/bold green]")
+            if filter_mode == "FREE":
+                model_choices = list(free_models)
+                console.print(f"[bold green][✓] Enrutamiento gratuito activado: Mostrando {len(model_choices)} modelos sin costo para {prov_meta['name']}.[/bold green]")
+            else:
+                model_choices = list(all_detected)
+                if live_models:
+                    console.print(f"[bold green][✓] Se detectaron {len(live_models)} modelos activos disponibles en tu cuenta.[/bold green]")
         else:
             model_choices = list(all_detected)
-            if live_models:
-                console.print(f"[bold green][✓] Se detectaron {len(live_models)} modelos activos disponibles en tu cuenta.[/bold green]")
+
 
         model_choices.append("Personalizado (Escribir manualmente)")
         model_choices.append("🔙 Cancelar y Regresar")
