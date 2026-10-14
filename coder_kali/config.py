@@ -20,23 +20,47 @@ SECRET_KEY_FILE = CONFIG_DIR / ".secret.key"
 DEFAULT_PROVIDERS = {
     "gemini": {
         "name": "Google Gemini",
-        "default_model": "gemini/gemini-3.8-flash",
+        "default_model": "gemini/gemini-1.5-flash",
         "available_models": [
-            "gemini/gemini-3.8-flash",
-            "gemini/gemini-3.6-flash",
-            "gemini/gemini-2.5-flash",
-            "gemini/gemini-2.5-pro",
             "gemini/gemini-1.5-flash",
             "gemini/gemini-1.5-pro",
-        ],
-        "free_models": [
             "gemini/gemini-3.8-flash",
             "gemini/gemini-2.5-flash",
+            "gemini/gemini-2.5-pro",
+        ],
+        "free_models": [
             "gemini/gemini-1.5-flash",
+            "gemini/gemini-3.8-flash",
+            "gemini/gemini-2.5-flash",
         ],
         "env_var": "GEMINI_API_KEY",
         "requires_api_key": True,
     },
+
+    "ollama": {
+        "name": "Ollama Local (100% Offline / Sin API Key)",
+        "default_model": "ollama/qwen2.5-coder:1.5b",
+        "available_models": [
+            "ollama/qwen2.5-coder:1.5b",
+            "ollama/qwen2.5-coder:7b",
+            "ollama/deepseek-r1:1.5b",
+            "ollama/llama3.2:1b",
+            "ollama/llama3.2:3b",
+            "ollama/mistral",
+        ],
+        "free_models": [
+            "ollama/qwen2.5-coder:1.5b",
+            "ollama/qwen2.5-coder:7b",
+            "ollama/deepseek-r1:1.5b",
+            "ollama/llama3.2:1b",
+            "ollama/llama3.2:3b",
+            "ollama/mistral",
+        ],
+        "env_var": "",
+        "requires_api_key": False,
+        "default_api_base": "http://localhost:11434",
+    },
+
 
     "anthropic": {
         "name": "Anthropic Claude",

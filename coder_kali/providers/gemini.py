@@ -88,8 +88,9 @@ class GeminiProvider(BaseLLMProvider):
                     resp = requests.post(url, json=payload, timeout=90)
 
             if resp.status_code in [503, 502, 504] or "UNAVAILABLE" in resp.text or "capacity" in resp.text.lower():
-                fallback_models = ["gemini-3.8-flash", "gemini-2.5-flash", "gemini-1.5-flash"]
+                fallback_models = ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-3.8-flash"]
                 for fb in fallback_models:
+
 
                     if fb != clean_model:
                         fb_url = f"{self.BASE_URL}/{fb}:generateContent?key={api_key.strip()}"
@@ -157,4 +158,16 @@ class GeminiProvider(BaseLLMProvider):
         res = self.chat_completion(clean_model, test_messages, max_tokens=20)
         if res.success:
             return True, f"Conexión exitosa con Gemini ({clean_model}): {res.content.strip() or 'OK'}"
+
+        # Si falló por 503 (sobrecarga) o 404 (no encontrado), probar alternativas estables automáticamente
+        err_str = res.error or ""
+        if "503" in err_str or "UNAVAILABLE" in err_str or "404" in err_str or "high demand" in err_str.lower():
+            for alt in ["gemini-1.5-flash", "gemini-1.5-pro"]:
+                if alt != clean_model:
+                    res_alt = self.chat_completion(alt, test_messages, max_tokens=20)
+                    if res_alt.success:
+                        self.config_mgr.set_active_model(f"gemini/{alt}")
+                        return True, f"Conexión exitosa con Gemini usando fallback automático '{alt}' (el modelo '{clean_model}' tiene alta demanda en Google)."
+
         return False, res.error or "Error al conectar con Gemini"
+
