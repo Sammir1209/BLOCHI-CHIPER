@@ -403,6 +403,19 @@ class SystemExecutor:
     def _execute_standard(self, cmd: str, cwd: Optional[str] = None) -> ExecutionResult:
         """Ejecución estándar mediante subprocess (PowerShell en Windows, Bash/Sh en Linux y Termux)."""
         try:
+            # Interceptar y bloquear ejecución sobre dominios ficticios / placeholders
+            placeholder_pattern = r"(?:https?://)?(?:www\.)?(?:target\.com|example\.com|vulnerable\.com|victim\.com|test\.com|dominio\.com|objetivo\.com)\b"
+            offensive_tools = ["sqlmap", "nmap", "hydra", "nuclei", "nikto", "wpscan", "ffuf", "gobuster", "theharvester"]
+            if re.search(placeholder_pattern, cmd, re.IGNORECASE) and any(t in cmd.lower() for t in offensive_tools):
+                console.print("[bold yellow][!] ALERTA TÁCTICA: El comando contiene un objetivo placeholder ficticio ('target.com' / 'example.com').[/bold yellow]")
+                console.print("[yellow][*] Por favor indica la URL, IP o dominio real del objetivo para iniciar el reconocimiento.[/yellow]")
+                return ExecutionResult(
+                    success=False,
+                    output="[BLOQUEO DE OBJETIVO PLACEHOLDER] No se puede ejecutar sobre 'target.com' ficticio. Operador: Indica la URL, IP o dominio real del objetivo.",
+                    returncode=1,
+                    command=cmd,
+                )
+
             if self.is_linux:
                 shell_cmd = [self.shell_path, "-c", cmd]
                 use_shell = False
@@ -413,6 +426,7 @@ class SystemExecutor:
             else:
                 shell_cmd = cmd
                 use_shell = True
+
 
             # Soporte nativo para ejecución en segundo plano (background tasks)
             is_background = cmd.strip().endswith("&") or "nohup " in cmd or "Start-Process" in cmd or "run_background" in cmd
