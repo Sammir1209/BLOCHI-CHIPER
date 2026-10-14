@@ -147,7 +147,7 @@ MISSION_PATTERNS = {
         r"\b(?:theharvester|amass|assetfinder|shodan|censys)\b",
     ],
     AgentRole.EXPLOIT: [
-        r"\b(?:exploit[ae]|atacar?|inyecci[oó]n|sqli?|sql\s*injection|xss|rce|lfi|rfi)\b",
+        r"\b(?:exploit[ae]|explotaci[oó]n|atacar?|inyecci[oó]n|sqli?|sql\s*injection|xss|rce|lfi|rfi)\b",
         r"\b(?:bypass|brute\s*force|fuerza\s*bruta|credenciales?|password|contrase[ñn]a)\b",
         r"\b(?:sqlmap|hydra|john|metasploit|msfconsole|payload|shell|reverse)\b",
         r"\b(?:dump(?:ear|ing)?|extraer?|exfiltrar?|volcar?|crackear?|descifrar?)\b",
@@ -191,6 +191,17 @@ class SwarmOrchestrator:
             Lista ordenada de roles de agentes que deben participar.
         """
         lower_msg = user_message.lower()
+
+        # Si la misión solicita auditoría o pentest integral, activar los 3 roles
+        full_mission_triggers = [
+            r"\b(?:auditor[ií]a\s+completa|pentest\s+(?:full|completo)|escaneo\s+total)\b",
+            r"\b(?:an[aá]lisis\s+completo|reconocimiento\s+y\s+explotaci[oó]n)\b",
+            r"\b(?:evalua(?:ci[oó]n|r)\s+(?:de\s+seguridad|completa))\b",
+            r"\b(?:misi[oó]n|operaci[oó]n|engagement)\s+(?:completa|total|integral)\b",
+        ]
+        if any(re.search(pat, lower_msg, re.IGNORECASE) for pat in full_mission_triggers):
+            return [AgentRole.RECON, AgentRole.EXPLOIT, AgentRole.AUDITOR]
+
         detected_roles = set()
 
         for role, patterns in MISSION_PATTERNS.items():
