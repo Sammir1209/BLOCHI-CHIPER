@@ -21,6 +21,7 @@ from coder_kali.session_manager import SessionManager, ChatSession
 from coder_kali.scope_manager import ScopeManager
 from coder_kali.jailgate import JailGate
 from coder_kali.mcp_hub import MCPSecurityHub
+from coder_kali.swarm import SwarmOrchestrator
 from coder_kali.ui.chat_render import (
     render_ai_message,
     render_execution_result,
@@ -64,6 +65,8 @@ class KaliAgent:
         self.jailgate = JailGate()
         # MCP Security Hub: Arsenal modular de herramientas de seguridad
         self.mcp_hub = MCPSecurityHub()
+        # Swarm Engine: Orquestador multi-agente táctico
+        self.swarm = SwarmOrchestrator()
 
         # Cargar sesión existente o crear nueva
         provider = self.config_mgr.get_active_provider()
@@ -336,6 +339,11 @@ class KaliAgent:
         augmented_user_message = user_text
         if tool_context:
             augmented_user_message = f"{user_text}\n\n{tool_context}"
+
+        # Detectar si la misión requiere activar el enjambre multi-agente
+        swarm_context = self.swarm.generate_swarm_context(user_text)
+        if swarm_context:
+            augmented_user_message += f"\n\n{swarm_context}"
 
         # Si el operador usa palabras clave de orden de ejecución directa
         lowered_txt = user_text.lower().strip()
