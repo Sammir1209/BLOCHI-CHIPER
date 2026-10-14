@@ -129,6 +129,9 @@ def render_ai_message(message: str):
         else:
             return
 
+    if not cleaned_text or not cleaned_text.strip():
+        return
+
     console.print()
     header_title = "✦ BLOOD-CIPHER [WINDOWS COPILOT]" if is_windows else "✦ BLOOD-CIPHER [KALI COPILOT]"
     header_style = "bold white on #0284c7" if is_windows else "bold white on #059669"
@@ -137,7 +140,7 @@ def render_ai_message(message: str):
     header = Text(f" {header_title} ", style=header_style)
     console.print(header)
 
-    md = Markdown(cleaned_text, code_theme="monokai", hyperlinks=True)
+    md = Markdown(cleaned_text.strip(), code_theme="monokai", hyperlinks=True)
     panel = Panel(
         md,
         border_style=border_style,
@@ -145,6 +148,7 @@ def render_ai_message(message: str):
         padding=(1, 2),
     )
     console.print(panel)
+
 
 
 def render_execution_result(result, command: Optional[str] = None):

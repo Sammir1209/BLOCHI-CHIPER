@@ -157,9 +157,9 @@ class KaliAgent:
 
 [DIRECTORIO DE TRABAJO DEDICADO DE LA SESIÓN]
 - Carpeta de la sesión: `{workspace_dir}`{workspace_files_summary}
-- REGLAS ESTRICTAS DE ORGANIZACIÓN Y SCRIPTING:
-  * MENOS CHAT, MÁS ACCIÓN TÁCTICA EN TIEMPO REAL: No des explicaciones extensas ni te quedes conversando. Actúa emitiendo comandos directos `<ejecutar_comando>` y `<escribir_archivo>` en tiempo real desde el primer turno.
+  * COMUNICACIÓN CLARA Y DIRECTA: Responde siempre en español claro y conciso. Si tienes un objetivo definido, describe brevemente la acción y emite los comandos correspondientes. Si el operador pide una tarea pero aún no indicó la URL, IP o dominio objetivo, responde preguntando directamente: "¿Cuál es la URL, IP o dominio objetivo para iniciar el reconocimiento?"
   * FOCO TÁCTICO INQUEBRANTABLE: Si hay un objetivo primario en curso (ej. dumping masivo de base de datos o extracción), NO te distraigas con búsquedas laterales ni cambies de tema. Mantén el foco 100% en completar el dump o extracción hasta el final.
+
   * PRINCIPIO DE SCRIPT ÚNICO: NO crees múltiples scripts (`extract_all.py`, `extract_resume.py`, `test_sqli.py`, `limpiar_datos.py`, etc.) para una misma tarea. Trabaja con UN SOLO script central de la sesión (ej: `{workspace_dir}/script_principal.py`) y cuando haya que mejorarlo, reanudarlo o corregirlo, MODIFICA Y SOBREESCRIBE ESE MISMO SCRIPT.
   * Todos los archivos de salida generados (ej: `{workspace_dir}/datos_extraidos.csv`, `{workspace_dir}/informe.txt`) deben guardarse de forma ordenada dentro de esta carpeta de sesión.
   * Todos los comandos ejecutados deben apuntar a esta carpeta `{workspace_dir}`.
@@ -575,15 +575,20 @@ class KaliAgent:
                 self.jailgate.reset_refusal_counter()
             clean_content = self.jailgate.sanitize_response(clean_content)
 
+            # Si el modelo no generó texto descriptivo y tampoco hay acciones pendientes
+            if not clean_content.strip() and not actions:
+                clean_content = "Entendido, operador. Para proceder con la auditoría o extracción, por favor indícame la URL, IP o dominio objetivo (o ejecuta `scope add <target>`)."
+
             # 5. Renderizar la respuesta del modelo (si hay contenido visible o comandos)
-            display_text = clean_content if clean_content else ai_content
-            if display_text or actions:
+            display_text = clean_content if clean_content.strip() else ai_content
+            if display_text.strip() or actions:
                 render_ai_message(display_text)
-                self.messages.append({"role": "assistant", "content": ai_content})
+                self.messages.append({"role": "assistant", "content": display_text})
                 final_response = display_text
             else:
-                render_ai_message("No se recibió texto descriptivo del modelo. Continuando...")
+                render_ai_message("A la orden, operador. Esperando directiva táctica u objetivo...")
                 break
+
 
             if not actions:
                 # No hay comandos ni archivos pendientes por ejecutar, fin del ciclo de razonamiento
