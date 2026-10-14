@@ -378,3 +378,10 @@ class JailGate:
             "rechazos_acumulados": self._refusal_count,
             "reintentos_restantes": max(0, self._max_reframes - self._refusal_count),
         }
+
+    @property
+    def status_summary(self) -> str:
+        """Resumen en texto legible del estado de JailGate."""
+        st = self.get_status()
+        return f"Activo | Persona: {st['persona_activa']} | Reintentos disponibles: {st['reintentos_restantes']}"
+
