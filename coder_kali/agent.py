@@ -395,6 +395,7 @@ class KaliAgent:
             self.messages.append({"role": "assistant", "content": tactical_greeting})
             self.current_session.messages = list(self.messages)
             self.session_mgr.save_session(self.current_session)
+            render_ai_message(tactical_greeting)
             return tactical_greeting
 
         # Detectar si se mencionan herramientas de Kali y adjuntar su sintaxis oficial
