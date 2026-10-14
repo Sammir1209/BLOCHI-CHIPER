@@ -35,7 +35,8 @@ BANNER_ART_WINDOWS = r"""
 """
 
 
-def print_banner(version: str = "2.0.0", provider: str = "gemini", model: str = "gemini-2.0-flash", scope: Optional[str] = None, key_pool_size: int = 1, workspace: Optional[str] = None):
+def print_banner(version: str = "2.0.0", provider: str = "gemini", model: str = "gemini-3.8-flash", scope: Optional[str] = None, key_pool_size: int = 1, workspace: Optional[str] = None):
+
     """Imprime el banner temático adaptado para Windows o Linux."""
     import platform
     is_windows = platform.system() == "Windows"

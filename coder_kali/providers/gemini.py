@@ -16,16 +16,15 @@ class GeminiProvider(BaseLLMProvider):
 
     def _clean_model_name(self, model: str) -> str:
         if not model:
-            return "gemini-2.0-flash"
+            return "gemini-3.8-flash"
         m = model.strip()
         if m.lower().startswith("gemini/"):
             m = m[len("gemini/"):]
-        # Los nombres válidos oficiales en la REST API de Google son: gemini-2.0-flash, gemini-1.5-flash, gemini-1.5-pro.
-        # Nombres como 2.5-flash o 3.6-flash no existen en la API y provocan error 503 / Timeout.
-        valid_models = ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro", "gemini-2.0-flash-lite", "gemini-2.0-pro-exp-02-05"]
-        if m not in valid_models:
-            return "gemini-2.0-flash"
+        # Si el modelo solicitado es gemini-2.0-flash (deprecado por Google), auto-actualizar a gemini-3.8-flash
+        if m in ("gemini-2.0-flash", "gemini-2.0-flash-exp"):
+            return "gemini-3.8-flash"
         return m
+
 
     def _format_messages(self, messages: List[Dict[str, str]]) -> Tuple[Optional[Dict[str, Any]], List[Dict[str, Any]]]:
         system_instruction = None
@@ -89,8 +88,9 @@ class GeminiProvider(BaseLLMProvider):
                     resp = requests.post(url, json=payload, timeout=90)
 
             if resp.status_code in [503, 502, 504] or "UNAVAILABLE" in resp.text or "capacity" in resp.text.lower():
-                fallback_models = ["gemini-2.0-flash", "gemini-1.5-flash"]
+                fallback_models = ["gemini-3.8-flash", "gemini-2.5-flash", "gemini-1.5-flash"]
                 for fb in fallback_models:
+
                     if fb != clean_model:
                         fb_url = f"{self.BASE_URL}/{fb}:generateContent?key={api_key.strip()}"
                         try:

@@ -20,8 +20,9 @@ SECRET_KEY_FILE = CONFIG_DIR / ".secret.key"
 DEFAULT_PROVIDERS = {
     "gemini": {
         "name": "Google Gemini",
-        "default_model": "gemini/gemini-2.5-flash",
+        "default_model": "gemini/gemini-3.8-flash",
         "available_models": [
+            "gemini/gemini-3.8-flash",
             "gemini/gemini-3.6-flash",
             "gemini/gemini-2.5-flash",
             "gemini/gemini-2.5-pro",
@@ -29,12 +30,14 @@ DEFAULT_PROVIDERS = {
             "gemini/gemini-1.5-pro",
         ],
         "free_models": [
+            "gemini/gemini-3.8-flash",
             "gemini/gemini-2.5-flash",
             "gemini/gemini-1.5-flash",
         ],
         "env_var": "GEMINI_API_KEY",
         "requires_api_key": True,
     },
+
     "anthropic": {
         "name": "Anthropic Claude",
         "default_model": "anthropic/claude-3-5-sonnet-20241022",
@@ -447,7 +450,7 @@ DEFAULT_PROVIDERS = {
 
 DEFAULT_CONFIG: Dict[str, Any] = {
     "provider": "gemini",
-    "model": "gemini/gemini-2.5-flash",
+    "model": "gemini/gemini-3.8-flash",
     "temperature": 0.2,
     "max_tokens": 4096,
     "api_keys": {},
@@ -659,7 +662,8 @@ class ConfigManager:
         return self.config.get("provider", "gemini")
 
     def get_active_model(self) -> str:
-        return self.config.get("model", "gemini/gemini-2.0-flash")
+        return self.config.get("model", "gemini/gemini-3.8-flash")
+
 
     def get_api_base(self, provider: Optional[str] = None) -> Optional[str]:
         prov = provider or self.get_active_provider()
