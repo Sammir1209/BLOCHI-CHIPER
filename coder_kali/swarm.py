@@ -388,59 +388,128 @@ class SwarmOrchestrator:
             f"curl -s \"https://crt.sh/?q=%25{slug}%25&output=json\" | grep -oP '\"name_value\":\\s*\"\\K[^\"]+' | sort -u | head -n 25",
         ]
 
-    def _generate_exploit_commands(self, target: str) -> List[str]:
-        """Genera comandos de explotación sugeridos para el target."""
+    def determine_current_phase(self, user_message: str, history: Optional[List[Dict[str, str]]] = None) -> int:
+        """
+        Determina dinámicamente en qué fase táctica se encuentra la operación:
+        1: Reconocimiento y OSINT
+        2: Mapeo de Red y Rutas
+        3: Análisis de Vulnerabilidades (nuclei, nikto, ffuf)
+        4: Explotación y Acceso a Datos (sqlmap, extracción)
+        """
+        lower = user_message.lower()
+
+        # Detección explícita de fase 4 (explotación / extracción / dumping)
+        if re.search(r'\b(?:dump(?:ear|ing)?|extraer|exfiltrar|inyecci[oó]n|sqli?|sqlmap|volcar\s+base|sacar\s+base|exploit|explotar)\b', lower):
+            return 4
+
+        # Detección explícita de fase 3 (vulnerabilidades / fallos / bugs / auditoría)
+        if re.search(r'\b(?:vulnerabilidad(?:es)?|vuln|fallos?|cve|nuclei|nikto|auditar?|brecha|debilidad(?:es)?|fuzz(?:ing)?)\b', lower):
+            return 3
+
+        # Detección explícita de fase 2 (rutas / directorios / endpoints / servicios)
+        if re.search(r'\b(?:rutas?|directorios?|endpoints?|servicios?|formularios?|crawling|spider)\b', lower):
+            return 2
+
+        # Analizar si en el historial ya se ejecutó la Fase 1
+        if history:
+            hist_str = " ".join(m.get("content", "") for m in history[-6:])
+            has_recon = "whatweb" in hist_str or "200 OK" in hist_str or "subfinder" in hist_str
+            has_vulns = "nuclei" in hist_str or "nikto" in hist_str
+            if has_vulns:
+                return 4
+            elif has_recon:
+                return 3
+
+        return 1
+
+    def _generate_phase_commands(self, target: str, phase: int) -> List[str]:
+        """Genera los comandos específicos para la fase activa."""
         if not target:
             return []
-        url = target if target.startswith("http") else f"https://{target}"
-        return [
-            f"nuclei -u {url} -severity high,critical -rl 150 -timeout 5 -j -o nuclei_findings.json",
-        ]
+        
+        # Normalizar URL y host
+        url_match = re.search(r'https?://[a-zA-Z0-9\.\-_/:]+', target)
+        if url_match:
+            full_url = url_match.group(0).rstrip('/')
+            host = re.sub(r'https?://', '', full_url).split('/')[0].split(':')[0].strip()
+        else:
+            clean = re.sub(r'https?://', '', target).split('/')[0].strip()
+            if "." in clean:
+                host = clean
+                full_url = f"https://{clean}"
+            else:
+                host = clean
+                full_url = f"https://{clean}.gob.pe"
+
+        if phase == 1:
+            return [
+                f"curl -I -s -k --max-time 10 {full_url}",
+                f"whatweb {full_url} -a 3 -v",
+                f"httpx-toolkit -u {full_url} -status-code -title -tech-detect -follow-redirects -silent",
+                f"nmap -sS -sV -T4 -p 80,443,8080,8443 --host-timeout 2m {host}",
+            ]
+        elif phase == 2:
+            return [
+                f"ffuf -u {full_url}/FUZZ -w /usr/share/wordlists/dirb/common.txt -mc 200,301,302,403 -timeout 5 -t 30",
+                f"curl -s -k {full_url}/robots.txt | head -n 30",
+                f"curl -s -k {full_url}/sitemap.xml | head -n 30",
+            ]
+        elif phase == 3:
+            return [
+                f"nuclei -u {full_url} -severity medium,high,critical -rate-limit 100 -timeout 5",
+                f"nikto -h {full_url} -maxtime 2m",
+                f"ffuf -u {full_url}/FUZZ -w /usr/share/wordlists/dirb/common.txt -mc 200,301,302,403 -timeout 5 -t 30",
+            ]
+        elif phase == 4:
+            return [
+                f"sqlmap -u \"{full_url}/\" --batch --level=1 --risk=1 --threads=5",
+            ]
+        return []
+
+    def _generate_exploit_commands(self, target: str) -> List[str]:
+        """Genera comandos de explotación sugeridos para el target."""
+        return self._generate_phase_commands(target, phase=4)
 
     def _generate_audit_commands(self, target: str) -> List[str]:
         """Genera comandos de auditoría sugeridos para el target."""
-        if not target:
-            return []
-        url = target if target.startswith("http") else f"https://{target}"
-        cmds = [
-            f"nuclei -u {url} -severity medium,high,critical -rl 150 -timeout 5 -j -o audit_findings.json",
-        ]
-        if "wp" in target.lower() or "wordpress" in target.lower():
-            cmds.append(f"wpscan --url {url} --enumerate u,vp --random-user-agent")
-        return cmds
+        return self._generate_phase_commands(target, phase=3)
 
-    def generate_swarm_context(self, user_message: str, target: str = "") -> str:
+    def generate_swarm_context(self, user_message: str, target: str = "", history: Optional[List[Dict[str, str]]] = None) -> str:
         """
         Genera el contexto del enjambre para inyectar en la respuesta del agente.
-        Solo se activa si la misión es lo suficientemente compleja o se proporciona un target.
+        Avanza dinámicamente de fase según la petición del operador y el progreso real.
         """
         effective_target = target or self._extract_target(user_message)
         if not self.is_complex_mission(user_message) and not effective_target:
             return ""
 
-        roles = self.analyze_mission(user_message)
         target_display = effective_target or "OBJETIVO INDICADO POR OPERADOR"
-        
-        recon_cmds = self._generate_recon_commands(effective_target)
+        phase = self.determine_current_phase(user_message, history=history)
+
+        phase_names = {
+            1: "Fase 1: Reconocimiento Pasivo y OSINT",
+            2: "Fase 2: Mapeo de Red, Endpoints y Directorios",
+            3: "Fase 3: Análisis de Vulnerabilidades y Fallos de Seguridad",
+            4: "Fase 4: Explotación y Acceso a Base de Datos",
+        }
+        phase_name = phase_names.get(phase, f"Fase {phase}")
+        phase_cmds = self._generate_phase_commands(effective_target, phase)
 
         lines = [
-            f"\n[🎯 PLAN TÁCTICO DE ENGAGEMENT POR FASES — {target_display.upper()}]",
-            "Estructura táctica de la operación (Control de tokens por turnos):",
-            "  • Fase 1: Reconocimiento Pasivo y OSINT (inspección HTTP, tecnologías whatweb, subdominios, puertos web)",
-            "  • Fase 2: Escaneo Activo y Mapeo de Red (detección de servicios, rutas dinámicas y parámetros con httpx/nmap)",
-            "  • Fase 3: Análisis de Vulnerabilidades (fuzzing con nuclei/ffuf de endpoints, formularios y CMS)",
-            "  • Fase 4: Explotación y Acceso a Base de Datos (ataques dirigidos con sqlmap sobre endpoints confirmados)",
+            f"\n[🎯 OPERACIÓN TÁCTICA ACTIVA — {phase_name.upper()} — {target_display.upper()}]",
+            f"Objetivo fijado: {target_display}",
+            f"Fase en ejecución: {phase_name}",
             "",
-            "DIRECTIVA OBLIGATORIA PARA ESTE TURNO:",
-            f"1. Objetivo confirmado: {target_display}.",
-            "2. Describe brevemente en 1 línea el inicio de la Fase 1 sobre este objetivo específico.",
-            "3. Emite de inmediato los comandos de la Fase 1 dentro de bloques <ejecutar_comando>.",
-            "4. Analiza con precisión técnica los resultados reales obtenidos sin inventar que la página no existe si responde con códigos HTTP.",
+            "DIRECTIVA DE ACCIÓN INMEDIATA PARA ESTE TURNO:",
+            f"1. El operador solicita avanzar en: {phase_name}.",
+            "2. Describe en 1 línea el vector táctico a evaluar y emite de inmediato los comandos correspondientes en bloques <ejecutar_comando>.",
+            "3. NUNCA repitas reconocimientos iniciales si ya se obtuvieron datos previos; avanza directamente con la fase solicitada.",
+            "4. TÚ ERES EL COPILOTO DE KALI: PROHIBIDO decir que consulte a un experto o analista; analiza técnicamente los resultados obtenidos.",
         ]
 
-        if recon_cmds:
-            lines.append("\nComandos prioritarios para iniciar Fase 1:")
-            for cmd in recon_cmds:
+        if phase_cmds:
+            lines.append(f"\nComandos requeridos para {phase_name}:")
+            for cmd in phase_cmds:
                 lines.append(f"  $ {cmd}")
 
         return "\n".join(lines)

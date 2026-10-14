@@ -336,6 +336,8 @@ class JailGate:
             r'Ten en cuenta que (?:el|la|esto|esta)',
             r'Sin embargo,?\s*(?:debo|es importante|cabe)',
             r'Como (?:modelo de IA|asistente|IA),?\s*(?:debo|no puedo)',
+            r'(?:Esto\s+puede\s+ser\s+un\s+proceso\s+que\s+requiere|requiere\s+la\s+ayuda\s+de\s+un\s+(?:experto|analista|profesional))',
+            r'(?:consulta\s+a\s+un\s+(?:experto|analista|profesional)|acude\s+a\s+un\s+(?:experto|analista))',
         ]
 
         for line in lines:

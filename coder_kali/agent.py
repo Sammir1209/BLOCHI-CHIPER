@@ -413,7 +413,7 @@ class KaliAgent:
             augmented_user_message = f"{user_text}\n\n{tool_context}"
 
         # Detectar si la misión requiere activar el enjambre multi-agente
-        swarm_context = self.swarm.generate_swarm_context(user_text, target=effective_target)
+        swarm_context = self.swarm.generate_swarm_context(user_text, target=effective_target, history=self.messages)
         if swarm_context:
             augmented_user_message += f"\n\n{swarm_context}"
         elif effective_target:
