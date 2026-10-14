@@ -110,9 +110,10 @@ class OllamaFastClient:
             "stream": stream,
             "options": {
                 "temperature": temperature,
-                "num_ctx": 8192,
+                "num_ctx": 4096,
             }
         }
+
 
 
         body = fast_json_dumps(payload)
@@ -162,8 +163,9 @@ class OllamaFastClient:
             "stream": True,
             "options": {
                 "temperature": temperature,
-                "num_ctx": 8192,
+                "num_ctx": 4096,
             }
+
 
         }
 

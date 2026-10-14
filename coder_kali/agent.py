@@ -87,12 +87,28 @@ class KaliAgent:
 
     def _get_effective_system_prompt(self) -> str:
         """Construye el prompt de sistema directo con contexto de entorno del host actual."""
+        provider = self.config_mgr.get_active_provider()
+        workspace_dir = getattr(self.current_session, "workspace_path", None)
+        if not workspace_dir:
+            workspace_dir = str(self.session_mgr.get_session_workspace(self.current_session.id))
+
+        # Para Ollama local (CPU), usar prompt táctico compacto para inferencia ultra rápida sin latencia
+        if provider == "ollama":
+            from coder_kali.prompts import PROMPT_OLLAMA_FAST
+            prompt = PROMPT_OLLAMA_FAST
+            active_scope = self.scope_mgr.get_active_scope_content()
+            if active_scope:
+                prompt += f"\n\n[OBJETIVO / SCOPE ACTIVO]\n{active_scope}"
+            prompt += f"\n- Carpeta de trabajo de la sesión: `{workspace_dir}`\n"
+            return prompt
+
         prompt = self.system_prompt
         
         # Inyectar información sobre el sistema operativo anfitrión real
         import platform
         os_name = platform.system()
         os_release = platform.release()
+
         
         if os_name == "Windows":
             os_context = f"""
