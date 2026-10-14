@@ -384,6 +384,12 @@ class MCPSecurityHub:
             "categories": categories,
         }
 
+    @property
+    def registry(self) -> Dict[str, SecurityTool]:
+        """Alias para self.tools compatible con consultas de registro."""
+        return self.tools
+
+
 
 # Inicializar registro al importar
 _register_builtin_tools()
