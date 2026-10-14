@@ -44,6 +44,7 @@ class OllamaProvider(BaseLLMProvider):
             messages=messages,
             temperature=temperature,
             timeout=300,
+            max_tokens=max_tokens,
         )
 
         if "error" in res:

@@ -99,11 +99,13 @@ class OllamaFastClient:
         temperature: float = 0.2,
         stream: bool = False,
         timeout: int = 120,
+        max_tokens: int = 700,
     ) -> Dict[str, Any]:
         """Envía una petición de chat directamente a Ollama para respuesta ultrarrápida."""
         import requests
 
         clean_model = model.replace("ollama/", "")
+        num_predict = min(max_tokens, 1024) if max_tokens else 700
         payload = {
             "model": clean_model,
             "messages": messages,
@@ -111,6 +113,7 @@ class OllamaFastClient:
             "options": {
                 "temperature": temperature,
                 "num_ctx": 4096,
+                "num_predict": num_predict,
             }
         }
 
@@ -152,11 +155,13 @@ class OllamaFastClient:
         model: str,
         messages: List[Dict[str, str]],
         temperature: float = 0.2,
+        max_tokens: int = 700,
     ) -> Generator[str, None, None]:
         """Generador de streaming token por token directamente desde Ollama."""
         import requests
 
         clean_model = model.replace("ollama/", "")
+        num_predict = min(max_tokens, 1024) if max_tokens else 700
         payload = {
             "model": clean_model,
             "messages": messages,
@@ -164,9 +169,8 @@ class OllamaFastClient:
             "options": {
                 "temperature": temperature,
                 "num_ctx": 4096,
+                "num_predict": num_predict,
             }
-
-
         }
 
         body = fast_json_dumps(payload)

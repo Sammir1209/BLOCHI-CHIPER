@@ -263,10 +263,11 @@ class KaliAgent:
                 continue
             cleaned_chat.append(m)
 
-        # En Groq y Plugsky el tier gratuito tiene límites de contexto / TPM
-        # por lo que mantenemos una ventana compacta de turnos recientes para evitar 429 / 503 continuos
+        # En Groq, Ollama y Plugsky mantenemos ventanas compactas de turnos recientes
+        # para evitar agotar memoria de CPU, context window o límites de tokens por minuto (TPM)
         is_plugsky = provider == "plugsky"
-        max_history = 6 if is_groq else (16 if is_plugsky else 50)
+        is_ollama = provider == "ollama"
+        max_history = 6 if (is_groq or is_ollama) else (16 if is_plugsky else 50)
         if len(cleaned_chat) > max_history:
             recent_msgs = [cleaned_chat[0]] + cleaned_chat[-(max_history - 1):]
         else:
@@ -282,10 +283,10 @@ class KaliAgent:
             import re
             content = re.sub(r'<think>[\s\S]*?</think>', '', content).strip()
 
-            # Compactar salidas de terminal intermedias para no consumir TPM innecesario
+            # Compactar salidas de terminal intermedias para no consumir tokens innecesarios
             is_latest = i == (len(recent_msgs) - 1)
-            if is_groq:
-                max_char_limit = 1000 if is_latest else 450
+            if is_groq or is_ollama:
+                max_char_limit = 800 if is_latest else 350
             elif is_plugsky:
                 max_char_limit = 1200 if is_latest else 600
             else:
@@ -314,10 +315,12 @@ class KaliAgent:
         if env_var and api_key:
             os.environ[env_var] = api_key.strip()
 
-        # Calcular límite de tokens dinámico según el proveedor para evitar cortes abruptos
+        # Calcular límite de tokens dinámico según el proveedor para evitar saturación y cortes abruptos
         configured_max = self.config_mgr.get("max_tokens", 4096)
         if provider == "groq":
             max_tokens = min(configured_max, 1024)
+        elif provider == "ollama":
+            max_tokens = min(configured_max, 600)  # Respuestas rápidas en CPU (< 5s) por fases
         elif provider in ["bai", "aimlapi", "openai", "anthropic", "openrouter", "gemini", "puter", "bazaarlink", "hive"]:
             max_tokens = max(configured_max, 4096)
         else:

