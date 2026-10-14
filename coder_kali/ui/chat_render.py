@@ -127,8 +127,9 @@ def render_ai_message(message: str):
     cleaned_text = re.sub(r'</?(?:ejecutar_comando|escribir_archivo)[^>]*>', '', cleaned_text, flags=re.IGNORECASE)
     cleaned_text = re.sub(r'\n{3,}', '\n\n', cleaned_text).strip()
 
-    # 3. Si no hay texto conversacional pero sí hay comandos, extraer un resumen descriptivo
-    if not cleaned_text.strip():
+    # 3. Comprobar si hay contenido visible real o solo espacios/saltos de línea
+    visible_chars = re.sub(r'[\s\n\r\t\u200b\xa0]+', '', cleaned_text)
+    if not visible_chars:
         xml_cmds = re.findall(r'<ejecutar_comando>([\s\S]*?)(?:</ejecutar_comando>|$)', raw_for_preview, flags=re.IGNORECASE)
         if not xml_cmds:
             xml_cmds = re.findall(r'<ejecutar_comando>([\s\S]*?)(?:</ejecutar_comando>|$)', message, flags=re.IGNORECASE)
@@ -138,7 +139,8 @@ def render_ai_message(message: str):
         else:
             return
 
-    if not cleaned_text or not cleaned_text.strip():
+    # Si aún no tiene al menos 2 caracteres visibles reales, no imprimir panel vacío
+    if len(re.sub(r'[\s\n\r\t\u200b\xa0]+', '', cleaned_text)) < 2:
         return
 
     console.print()

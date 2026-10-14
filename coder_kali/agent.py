@@ -67,6 +67,7 @@ class KaliAgent:
         self.mcp_hub = MCPSecurityHub()
         # Swarm Engine: Orquestador multi-agente táctico
         self.swarm = SwarmOrchestrator()
+        self.active_target: str = ""
 
         # Cargar sesión existente o crear nueva
         provider = self.config_mgr.get_active_provider()
@@ -398,6 +399,13 @@ class KaliAgent:
             render_ai_message(tactical_greeting)
             return tactical_greeting
 
+        # Rastrear y fijar objetivo operativo activo (URL, dominio, IP o entidad)
+        detected_target = self.swarm._extract_target(user_text)
+        if detected_target:
+            self.active_target = detected_target
+
+        effective_target = self.active_target or detected_target
+
         # Detectar si se mencionan herramientas de Kali y adjuntar su sintaxis oficial
         tool_context = self.tools_db.detect_relevant_context(user_text)
         augmented_user_message = user_text
@@ -405,9 +413,11 @@ class KaliAgent:
             augmented_user_message = f"{user_text}\n\n{tool_context}"
 
         # Detectar si la misión requiere activar el enjambre multi-agente
-        swarm_context = self.swarm.generate_swarm_context(user_text)
+        swarm_context = self.swarm.generate_swarm_context(user_text, target=effective_target)
         if swarm_context:
             augmented_user_message += f"\n\n{swarm_context}"
+        elif effective_target:
+            augmented_user_message += f"\n\n[OBJETIVO CONFIRMADO DE LA OPERACIÓN: {effective_target}]"
 
         # Si el operador usa palabras clave de orden de ejecución directa
         if lowered_txt in ["ejecutalos", "ejecútalos", "ejecuta", "continua", "continuemos", "continuemo", "hazlo", "dale", "si", "sí", "corre los comandos"]:
