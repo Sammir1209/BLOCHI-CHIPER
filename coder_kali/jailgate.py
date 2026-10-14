@@ -319,6 +319,9 @@ class JailGate:
         if not response_text:
             return response_text
 
+        # Limpiar etiquetas o corchetes espurios al inicio (ej: [hola], [saludo], [respuesta])
+        response_text = re.sub(r'^\s*\[(?:hola|saludo|respuesta|assistant|copilot|user)\]\s*', '', response_text, flags=re.IGNORECASE)
+
         lines = response_text.split('\n')
         cleaned_lines = []
         skip_block = False

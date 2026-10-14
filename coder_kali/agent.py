@@ -353,6 +353,50 @@ class KaliAgent:
         Envía un mensaje de usuario e inicia el bucle de ejecución de acciones XML.
         Retorna la respuesta final generada por el modelo.
         """
+        import re
+
+        # Manejo ágil e instantáneo de saludos y peticiones genéricas de asistencia sin objetivo
+        lowered_txt = user_text.lower().strip()
+        is_greeting_or_help = bool(re.match(
+            r'^(?:hola|buenas|buenos\s+d[ií]as|buenas\s+tardes|buenas\s+noches|hey|saludos|'
+            r'me\s+ayudas?(?:\s+(?:por\s+favor|con\s+algo))?|ayuda|ay[uú]dame|help|'
+            r'qu[eé]\s+(?:haces|puedes\s+hacer|hacemos)|c[oó]mo\s+funciona|qu[eé]\s+tal)[\s\?!.]*$',
+            lowered_txt,
+            re.IGNORECASE,
+        ))
+
+        if is_greeting_or_help:
+            # Si en los turnos recientes ya hubo saludo, responder con solicitud directa de coordenadas
+            last_was_greeting = False
+            for m in reversed(self.messages[-4:]):
+                if m.get("role") == "user" and re.match(r'^(?:hola|buenas|me\s+ayudas?|ayuda|hey)', m.get("content", "").lower().strip(), re.IGNORECASE):
+                    last_was_greeting = True
+                    break
+
+            if last_was_greeting:
+                tactical_greeting = (
+                    "✦ **Blood-Cipher v2.0** a la orden.\n\n"
+                    "Listo para proceder. Proporciona la **URL, IP o entidad objetivo** "
+                    "(por ejemplo: `objetivo es policia nacional del peru DIRANDRO` o `https://target.com`) "
+                    "y comenzaremos de inmediato con el reconocimiento y la auditoría técnica."
+                )
+            else:
+                tactical_greeting = (
+                    "✦ **Blood-Cipher v2.0** [Kali Tactical Copilot] activo y listo para operar.\n\n"
+                    "Indícame el **objetivo** (URL, dominio, IP o entidad) y la tarea a realizar:\n"
+                    "  • **Fase 1: Reconocimiento y OSINT**: Descubrimiento de subdominios, certificados crt.sh, WHOIS y DNS.\n"
+                    "  • **Fase 2: Escaneo Activo**: Mapeo de puertos y fingerprint de tecnologías (`nmap`, `httpx`, `whatweb`).\n"
+                    "  • **Fase 3: Análisis de Vulnerabilidades**: Fuzzing de endpoints dinámicos, CMS y fallos web (`nuclei`, `ffuf`).\n"
+                    "  • **Fase 4: Explotación y Base de Datos**: Pruebas de inyección y extracción de datos (`sqlmap`).\n\n"
+                    "¿Cuál es el objetivo o target que vamos a auditar?"
+                )
+
+            self.messages.append({"role": "user", "content": user_text})
+            self.messages.append({"role": "assistant", "content": tactical_greeting})
+            self.current_session.messages = list(self.messages)
+            self.session_mgr.save_session(self.current_session)
+            return tactical_greeting
+
         # Detectar si se mencionan herramientas de Kali y adjuntar su sintaxis oficial
         tool_context = self.tools_db.detect_relevant_context(user_text)
         augmented_user_message = user_text
@@ -365,7 +409,6 @@ class KaliAgent:
             augmented_user_message += f"\n\n{swarm_context}"
 
         # Si el operador usa palabras clave de orden de ejecución directa
-        lowered_txt = user_text.lower().strip()
         if lowered_txt in ["ejecutalos", "ejecútalos", "ejecuta", "continua", "continuemos", "continuemo", "hazlo", "dale", "si", "sí", "corre los comandos"]:
             augmented_user_message += (
                 "\n\n[DIRECTIVA TÁCTICA DE EJECUCIÓN INMEDIATA]\n"
@@ -416,6 +459,8 @@ class KaliAgent:
                             max_tokens = min(configured_max, 1024)
                         elif provider == "plugsky":
                             max_tokens = min(configured_max, 2048)
+                        elif provider == "ollama":
+                            max_tokens = min(configured_max, 600)
                         elif provider in ["bai", "aimlapi", "openai", "anthropic", "openrouter", "gemini", "puter", "bazaarlink", "hive"]:
                             max_tokens = max(configured_max, 4096)
                         else:
